@@ -1,0 +1,32 @@
+[2026-04-06 02:40:31 +0000] [1] [INFO] Starting gunicorn 25.3.0
+[2026-04-06 02:40:31 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-04-06 02:40:31 +0000] [1] [INFO] Using worker: uvicorn.workers.UvicornWorker
+[2026-04-06 02:40:31 +0000] [7] [INFO] Booting worker with pid: 7
+[2026-04-06 02:40:31 +0000] [8] [INFO] Booting worker with pid: 8
+[2026-04-06 02:40:31 +0000] [9] [INFO] Booting worker with pid: 9
+[2026-04-06 02:40:31 +0000] [10] [INFO] Booting worker with pid: 10
+[2026-04-06 02:40:31 +0000] [1] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+/usr/local/lib/python3.12/site-packages/pydantic/_internal/_config.py:383: UserWarning: Valid config keys have changed in V2:
+* 'orm_mode' has been renamed to 'from_attributes'
+  warnings.warn(message, UserWarning)
+[2026-04-06 02:40:31 +0000] [7] [INFO] Started server process [7]
+[2026-04-06 02:40:31 +0000] [7] [INFO] Waiting for application startup.
+[2026-04-06 02:40:31 +0000] [7] [INFO] Application startup complete.
+/usr/local/lib/python3.12/site-packages/pydantic/_internal/_config.py:383: UserWarning: Valid config keys have changed in V2:
+* 'orm_mode' has been renamed to 'from_attributes'
+  warnings.warn(message, UserWarning)
+[2026-04-06 02:40:31 +0000] [8] [INFO] Started server process [8]
+[2026-04-06 02:40:31 +0000] [8] [INFO] Waiting for application startup.
+[2026-04-06 02:40:31 +0000] [8] [INFO] Application startup complete.
+/usr/local/lib/python3.12/site-packages/pydantic/_internal/_config.py:383: UserWarning: Valid config keys have changed in V2:
+* 'orm_mode' has been renamed to 'from_attributes'
+  warnings.warn(message, UserWarning)
+[2026-04-06 02:40:31 +0000] [9] [INFO] Started server process [9]
+[2026-04-06 02:40:31 +0000] [9] [INFO] Waiting for application startup.
+[2026-04-06 02:40:31 +0000] [9] [INFO] Application startup complete.
+/usr/local/lib/python3.12/site-packages/pydantic/_internal/_config.py:383: UserWarning: Valid config keys have changed in V2:
+* 'orm_mode' has been renamed to 'from_attributes'
+  warnings.warn(message, UserWarning)
+[2026-04-06 02:40:31 +0000] [10] [INFO] Started server process [10]
+[2026-04-06 02:40:31 +0000] [10] [INFO] Waiting for application startup.
+[2026-04-06 02:40:31 +0000] [10] [INFO] Application startup complete.

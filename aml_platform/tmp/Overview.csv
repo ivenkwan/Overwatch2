@@ -1,0 +1,15 @@
+,Unnamed: 0,Unnamed: 1,Unnamed: 2,Unnamed: 3,Unnamed: 4
+0,,Hong Kong AML Monitoring KPI & Control Matrix,,,
+1,,Polished workbook for fiat and stablecoin AML operations aligned to HKMA monitoring/STR guidance and JFIU STREAMS 2 expectations.,,,
+2,,,,,
+3,,,,,
+4,,Sheet,Description,Primary use,Link
+5,,Overview,Navigation and workbook context,Read me,Open
+6,,KPI_Matrix,"KPI dictionary with formulas, thresholds and owners",Management MIS,Open
+7,,Control_Mapping,HKMA/JFIU control-to-screen matrix,Compliance traceability,Open
+8,,Wireframe,Dashboard wireframe and screen intent,Design blueprint,Open
+9,,,,,
+10,,,,,
+11,,"Thresholds in this workbook are suggested internal management triggers, not regulatory numeric minima. HKMA expects institution-specific calibration based on risk profile, segmentation, product mix, and testing.",,,
+12,,,,,
+13,,"Sources: HKMA Guidance Paper on Transaction Monitoring, Screening and STR (2023); HKMA Insights on Optimisation of Transaction Monitoring Systems (2024); JFIU suspicion assessment and STREAMS 2 guidance. Generated: 2026-04-06 14:19",,,

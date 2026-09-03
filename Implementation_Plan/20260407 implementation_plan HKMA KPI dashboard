@@ -1,0 +1,62 @@
+# HKMA AML KPI Datamart & Governance Dashboard
+
+Based on the `KPI_Matrix.csv` requirements, this plan encompasses the ETL logic for daily aggregations, backend distribution, and the frontend Governance MIS dashboard. This plan has undergone a simulated multi-agent brainstorming review to ensure scalability and reliability.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Active Relationships Approximation**: The "Alert rate" KPI requires dividing by "Active monitored relationships". Since our database (`core.customers`) currently functions strictly as a dimension table without historical relationship statuses, the ETL will approximate "Active Relationships" by counting distinct `customer_num` transacting within the last 30 days. Let me know if you prefer a static placeholder (e.g., 50,000) for this denominator instead.
+
+## Proposed Changes
+
+### Database Layer (PostgreSQL)
+
+#### [NEW] `schema_mart.sql` (to be executed)
+- Create schema `mart` if not exists.
+- Create table `mart.daily_aml_kpi`:
+  - `report_date` (DATE, Primary Key)
+  - `alert_rate` (FLOAT)
+  - `false_positive_rate` (FLOAT)
+  - `productive_alert_rate` (FLOAT)
+  - `first_review_sla_rate` (FLOAT)
+  - `case_cycle_time_days` (FLOAT)
+  - *Base Metrics*: `total_alerts`, `closed_non_suspicious`, `cases_opened`, `strs_filed`
+
+### Backend / ETL Component
+
+#### [NEW] `backend/etl/daily_kpi_mart.py`
+- Python script intended to run daily (e.g. via crontab or Dagster).
+- Calculates metrics for `T-1` by aggregating `core.transactions` and `app.alerts`.
+- **Constraint Handling (Div By Zero)**: Uses zero-safe division `x / (y or 1)` or `NULLIF` equivalents to prevent crashes on low-volume days.
+- **Idempotency**: Implements `ON CONFLICT (report_date) DO UPDATE` to allow safe rerunning of the ETL for a given date.
+
+#### [MODIFY] `backend/app/api/v1/reports.py`
+- Add `GET /v1/reports/kpis` endpoint to retrieve sorted `mart.daily_aml_kpi` data for the frontend dashboard.
+
+### Frontend Component
+
+#### [NEW] `frontend/src/app/(dashboard)/governance/page.tsx`
+- Build the "Governance MIS" module specified in the Todo list.
+- Implement specialized KPI Cards displaying T+1 metrics.
+
+#### [MODIFY] `frontend/src/services/api.ts`
+- Expose the `/v1/reports/kpis` endpoint locally.
+
+#### [MODIFY] `frontend/src/components/modules/GovernanceMIS.tsx` (or direct inline)
+- **Threshold Mapping**: Code the HKMA thresholds directly into the UI layer to color-code metrics accurately:
+  - False Positive Rate: Green `<=90%`, Amber `90.1-95%`, Red `>95%`
+  - Alert Rate: Baseline display
+
+## Open Questions
+
+> [!WARNING]
+> **SLA Calculations**: The KPI matrix expects metrics like "Backlog ageing (open alerts past SLA)". We currently do not have a hardcoded `SLA_deadline` column in the `app.alerts` table. For the scope of this update, should the ETL assume a fixed SLA (e.g., 48 hours from `created_at`), or should we omit SLA-based KPIs for now?
+
+## Verification Plan
+
+### Automated Tests
+- Run `daily_kpi_mart.py --date 2026-04-06` to ensure it successfully computes a row and upserts `mart.daily_aml_kpi` without errors.
+
+### Manual Verification
+- Navigate to the Governance Dashboard via the left Navigation menu (`/governance`).
+- Ensure KPI values populate cleanly and render appropriate HKMA RAG (Red/Amber/Green) statuses without NaN/DivZero errors.

@@ -1,0 +1,19 @@
+,Unnamed: 0,Unnamed: 1,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6
+0,,HKMA / JFIU Control-to-Screen Mapping,,,,,
+1,,,,,,,
+2,,Regulator,Regulatory expectation,Control objective,Screen / widget,Required fields or actions,Owner
+3,,HKMA,TM system should generate alerts or MIS reports,"Detect suspicious patterns across fiat, stablecoin, and hybrid flows",Risk & Flow Overview; Alert Workbench,Scenario ID; timestamp; product/channel; fiat/stablecoin flag; score,AML Monitoring
+4,,HKMA,"Alert review should assess background, purpose, profile, and rationale",Evidence-based closure or escalation,Alert Detail Panel,CDD profile; prior alerts; customer explanation; open-source checks; rationale,L1/L2 Investigations
+5,,HKMA,"Segmentation, thresholds, and testing should be risk-based","Tune by product, segment, and typology",Governance & Tuning,Segment; threshold set; test result; approver; review date,TM Tuning Manager
+6,,HKMA,Data quality and lineage should be tested,Prevent bad-data-driven misses or false alerts,Data Issues Widget,Source system; failed field; exception volume; remediation owner,Data Governance
+7,,HKMA,"Timelines, triage, and backlog escalation should be defined",Timely queue management,KPI Strip; Queue Ageing,Age bucket; owner; escalation status; committee flag,Operations Manager
+8,,HKMA,Independent QA of alert clearance,Validate analyst decision quality,Governance & Tuning,QA sample; exception type; analyst; remediation action,Quality Assurance
+9,,HKMA,Screening systems need current databases and handling logic,Manage sanctions/name/wallet list alerts,Screening & Exceptions,List source; update time; hit status; tuning notes,Screening Lead
+10,,HKMA,"STRs should be accurate, complete, concise, and structured",Improve filing intelligence value,STR Drafting,Triggering factors; subject profile; transaction summary; conclusion,MLRO
+11,,HKMA,Digital footprints should be included where relevant and available,Capture cyber-enabled evidence,STR Drafting; Case Desk,IP; device ID; timestamp; geolocation; login channel,FIU / MLRO
+12,,HKMA,Attachments should supplement narrative and be editable where appropriate,Make annexures usable by JFIU,STR Drafting,Narrative text; editable CSV/XLS; attachment labels,FIU Manager
+13,,HKMA,Connected networks/common attributes should be reported where practicable,"Show linked accounts, wallets, devices, counterparties",Case Desk Graph,Linked entities; common IP/device; prior STR refs,Investigations Lead
+14,,JFIU,"SAFE approach: Screen, Ask, Find, Evaluate",Structured suspicion assessment,Alert Workflow,Indicator; customer question log; record review; evaluation,L1/L2 Investigations
+15,,JFIU,Report where knowledge or suspicion exists as soon as practicable,Avoid delayed STR filing,KPI Strip; STR Queue,Suspicion date; filing due clock; approval SLA,MLRO
+16,,JFIU,STREAMS 2 electronic submission for regulated entities,Submission readiness and control,STR Drafting,Submission channel; e-cert readiness; submission ref,MLRO / Compliance
+17,,JFIU,"STR should include particulars, suspicious facts, reasons, and explanation if any",Base completeness of filing,STR Mandatory Fields Panel,Identity data; address; account/wallet; suspicious facts; explanation,FIU Analyst

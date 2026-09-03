@@ -1,0 +1,250 @@
+%%{init: {
+  'theme': 'dark',
+  'themeVariables': {
+    'primaryColor': '#1e3a5f',
+    'primaryTextColor': '#e6edf3',
+    'primaryBorderColor': '#388bfd',
+    'lineColor': '#8b949e',
+    'secondaryColor': '#161b22',
+    'tertiaryColor': '#0d1117',
+    'attributeBackgroundColorOdd': '#161b22',
+    'attributeBackgroundColorEven': '#0d1117',
+    'fontFamily': 'ui-monospace, SFMono-Regular, monospace',
+    'fontSize': '13px'
+  },
+  'er': {
+    'diagramPadding': 60,
+    'layoutDirection': 'TB',
+    'minEntityWidth': 180,
+    'minEntityHeight': 80,
+    'entityPadding': 16,
+    'useMaxWidth': true
+  }
+}}%%
+erDiagram
+
+    %% ═══════════════════════════════════════════════════
+    %% DOMAIN 1 — KYC / PARTY
+    %% HK Regulation: AMLO Sch.2 s.2 (CDD); s.10 (PEP EDD)
+    %% ═══════════════════════════════════════════════════
+
+    PARTY {
+        UUID    party_id PK
+        string  party_type       "INDIVIDUAL / CORPORATE / TRUST"
+        string  full_name
+        string  hkid_or_passport
+        string  risk_tier        "LOW / MEDIUM / HIGH / PEP"
+        string  kyc_status       "PENDING / VERIFIED / EDD_REQUIRED"
+        date    retention_expiry "6+ yrs from account closure"
+    }
+
+    BENEFICIAL_OWNER {
+        UUID    bo_id PK
+        UUID    party_id FK
+        UUID    entity_id FK
+        decimal ownership_pct    ">=25% threshold (AMLO)"
+        string  control_type     "DIRECT / INDIRECT / EFFECTIVE"
+        string  cr_number        "Companies Registry ref"
+    }
+
+    PEP_RECORD {
+        UUID    pep_id PK
+        UUID    party_id FK
+        string  pep_category     "DOMESTIC / FOREIGN / IO / FAMILY"
+        char3   jurisdiction
+        string  list_source      "World-Check / Refinitiv"
+        string  status           "CONFIRMED / DISMISSED"
+    }
+
+    %% ═══════════════════════════════════════════════════
+    %% DOMAIN 2 — CORE BANKING / FIAT
+    %% HK Regulation: AMLO Sch.2 s.12 (wire >= HKD 8k)
+    %%               HKMA Feb-2025 circular (FPS >= HKD 10k)
+    %% ═══════════════════════════════════════════════════
+
+    ACCOUNT {
+        UUID    account_id PK
+        UUID    party_id FK
+        string  account_type     "CURRENT / SAVINGS / CORPORATE"
+        char3   currency         "HKD / RMB / USD"
+        string  status           "ACTIVE / DORMANT / RESTRICTED"
+        string  risk_tier
+    }
+
+    FIAT_TRANSACTION {
+        UUID    txn_id PK
+        UUID    account_id FK
+        string  channel          "FPS / RTGS / SWIFT / ATM / SVF"
+        decimal amount
+        decimal amount_hkd_equiv "FX-normalised for thresholds"
+        ts      txn_datetime
+        string  counterparty_name
+        string  fps_name_match_status "MATCHED / MISMATCH / BYPASSED"
+        boolean cdd_threshold_flag    "TRUE if >= HKD 8000 wire"
+        UUID    batch_run_id
+    }
+
+    WIRE_TRANSFER {
+        UUID    wire_id PK
+        UUID    txn_id FK
+        string  originator_name
+        string  originator_account
+        string  originator_id_no
+        string  beneficiary_name
+        string  beneficiary_account
+        string  threshold_tier   "BELOW_8K / AT_ABOVE_8K"
+        boolean verified_flag
+    }
+
+    %% ═══════════════════════════════════════════════════
+    %% DOMAIN 3 — VIRTUAL ASSET / STABLECOIN
+    %% HK Regulation: AMLO Sch.2 s.13A (Travel Rule)
+    %%               Stablecoins Ordinance 2025 (zero-threshold)
+    %% ═══════════════════════════════════════════════════
+
+    WALLET {
+        UUID    wallet_id PK
+        string  address
+        string  blockchain_network "ETH / TRON / POLYGON / SOL"
+        string  wallet_type        "HOSTED / SELF_HOSTED / SMART_CONTRACT"
+        UUID    party_id FK
+        boolean ownership_verified "Cryptographic proof required"
+        decimal risk_score         "0-100 from blockchain analytics"
+        string  risk_label         "CLEAN / MIXER / DARKNET / SANCTIONS"
+    }
+
+    VA_TRANSACTION {
+        UUID    va_txn_id PK
+        UUID    wallet_id_from FK
+        UUID    wallet_id_to FK
+        string  tx_hash            "On-chain unique identifier"
+        string  token_type         "HKDG / USDT / USDC / NATIVE"
+        decimal amount_hkd_equiv
+        ts      txn_datetime
+        boolean cdd_threshold_flag "TRUE if >= HKD 8000"
+        UUID    batch_run_id
+    }
+
+    TRAVEL_RULE_RECORD {
+        UUID    tr_id PK
+        UUID    va_txn_id FK
+        string  role               "ORDERING / BENEFICIARY"
+        string  originator_name
+        string  originator_id_no   "Required if >= HKD 8000"
+        string  beneficiary_name
+        string  threshold_tier     "BELOW_8K / AT_ABOVE_8K"
+        string  travel_rule_protocol "TRISA / OpenVASP / Notabene"
+        string  compliance_status  "COMPLIANT / PENDING / MISSING"
+    }
+
+    %% ═══════════════════════════════════════════════════
+    %% DOMAIN 4 — AML DETECTION
+    %% HK Regulation: HKMA Guidance Paper Feb-2023
+    %%               HKMA real-time monitoring circular 2023
+    %% ═══════════════════════════════════════════════════
+
+    DETECTION_RULE {
+        UUID    rule_id PK
+        string  rule_code          "RT-SANC-001 / BATCH-STR-001 etc."
+        string  category           "STRUCTURING/VELOCITY/PEP/SANCTIONS"
+        string  asset_type         "FIAT / VA / BOTH"
+        string  detection_mode     "RT / BATCH / HYBRID"
+        decimal threshold_value
+        string  hk_regulation_ref  "e.g. AMLO Sch.2 s.12"
+        boolean active_flag
+    }
+
+    SANCTIONS_SCREENING {
+        UUID    screen_id PK
+        UUID    entity_ref         "party_id / wallet_id / counterparty"
+        string  entity_type        "PARTY / WALLET / COUNTERPARTY"
+        string  list_name          "UN / OFAC_SDN / HKSAR_DESIGNATED"
+        decimal match_score
+        string  status             "HIT / CLEAR / FALSE_POSITIVE"
+        UUID    escalated_to_case FK
+    }
+
+    ALERT {
+        UUID    alert_id PK
+        UUID    source_txn_id      "fiat_transaction or va_transaction"
+        string  source_type        "FIAT / VA"
+        UUID    rule_id FK
+        decimal alert_score        "0-100 composite risk score"
+        string  detection_mode     "RT / BATCH"
+        string  status             "NEW/IN_REVIEW/ESCALATED/CLOSED"
+        boolean false_positive_flag
+        decimal ml_score           "ML model override"
+        UUID    case_id FK
+    }
+
+    %% ═══════════════════════════════════════════════════
+    %% DOMAIN 5 — CASE MANAGEMENT & REGULATORY REPORTING
+    %% HK Regulation: JFIU STREAMS 2 (STR filing)
+    %%               AMLO 6-year record retention
+    %% ═══════════════════════════════════════════════════
+
+    CASE_RECORD {
+        UUID    case_id PK
+        UUID    alert_id FK
+        string  case_type          "ML / TF / SANCTIONS / FRAUD_ML"
+        UUID    party_id FK
+        string  case_status        "OPEN/PENDING_EDD/PENDING_STR/CLOSED"
+        string  risk_level         "LOW / MEDIUM / HIGH / CRITICAL"
+        boolean str_filed_flag
+        ts      str_filing_deadline "JFIU SLA countdown"
+    }
+
+    STR_REPORT {
+        UUID    str_id PK
+        UUID    case_id FK
+        string  jfiu_ref_no        "Assigned by JFIU post-submission"
+        date    filing_date
+        string  str_type           "ML / TF / PF"
+        ts      streams2_submission_ts "STREAMS 2 electronic filing"
+        UUID    subject_party_id FK
+        string  status             "PENDING / FILED / ACKNOWLEDGED"
+    }
+
+    AUDIT_LOG {
+        bigint  log_id PK
+        string  entity_type
+        UUID    entity_id
+        string  action             "CREATE/UPDATE/VIEW/EXPORT"
+        string  actor_role         "ANALYST/SUPERVISOR/MLRO/SYSTEM"
+        ts      ts
+        date    retention_expiry   "7 years — immutable"
+        boolean immutable_flag
+    }
+
+    %% ═══════════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════════
+
+    PARTY             ||--o{ ACCOUNT            : "holds"
+    PARTY             ||--o{ BENEFICIAL_OWNER   : "identified as"
+    PARTY             ||--o| PEP_RECORD         : "screened as"
+    PARTY             ||--o{ WALLET             : "owns"
+    PARTY             ||--o{ CASE_RECORD        : "subject of"
+
+    ACCOUNT           ||--o{ FIAT_TRANSACTION   : "debited/credited"
+
+    FIAT_TRANSACTION  ||--o| WIRE_TRANSFER      : "extended by"
+    FIAT_TRANSACTION  }o--o{ SANCTIONS_SCREENING : "screened via"
+    FIAT_TRANSACTION  ||--o{ ALERT              : "raises"
+
+    WALLET            ||--o{ VA_TRANSACTION     : "sends from"
+    WALLET            ||--o{ VA_TRANSACTION     : "receives to"
+    WALLET            }o--o{ SANCTIONS_SCREENING : "screened via"
+
+    VA_TRANSACTION    ||--o| TRAVEL_RULE_RECORD  : "governed by"
+    VA_TRANSACTION    ||--o{ ALERT              : "raises"
+
+    DETECTION_RULE    ||--o{ ALERT              : "triggers"
+
+    ALERT             }o--|| CASE_RECORD        : "escalated to"
+    SANCTIONS_SCREENING }o--o| CASE_RECORD      : "escalated to"
+
+    CASE_RECORD       ||--o| STR_REPORT         : "filed as"
+    CASE_RECORD       }o--o{ AUDIT_LOG          : "audited by"
+    STR_REPORT        }o--o{ AUDIT_LOG          : "audited by"
+    PARTY             }o--o{ AUDIT_LOG          : "audited by"

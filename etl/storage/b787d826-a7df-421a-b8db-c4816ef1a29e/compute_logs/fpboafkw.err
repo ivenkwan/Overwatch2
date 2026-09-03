@@ -1,0 +1,8 @@
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - LOGS_CAPTURED - Started capturing logs in process (pid: 2760).
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - STEP_START - Started execution of step "load_relational_tables".
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - load_relational_tables - Loading file from: /opt/dagster/app/storage/cleaned_ledger_data using PickledObjectFilesystemIOManager...
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - LOADED_INPUT - Loaded input "cleaned_ledger_data" using input manager "io_manager", from output "result" of step "cleaned_ledger_data"
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - STEP_INPUT - Got input "cleaned_ledger_data" of type "DataFrame". (Type check passed).
+2026-04-06 13:01:12 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - STEP_OUTPUT - Yielded output "result" of type "Nothing". (Type check passed).
+2026-04-06 13:01:13 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - ASSET_MATERIALIZATION - Materialized value load_relational_tables.
+2026-04-06 13:01:13 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2760 - load_relational_tables - STEP_SUCCESS - Finished execution of step "load_relational_tables" in 783ms.

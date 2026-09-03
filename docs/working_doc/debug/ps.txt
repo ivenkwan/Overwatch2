@@ -1,0 +1,4 @@
+CONTAINER ID   IMAGE                              COMMAND                  CREATED         STATUS                          PORTS                    NAMES
+3420b6e0b807   aml_platform-aml-frontend          "docker-entrypoint.s…"   5 minutes ago   Up 5 minutes                    0.0.0.0:3000->3000/tcp   aml-nextjs-frontend
+3e3a08c09ca6   quay.io/keycloak/keycloak:26.0.0   "/opt/keycloak/bin/k…"   5 minutes ago   Restarting (1) 48 seconds ago                            aml-keycloak
+c49dacdbd8ee   aml_platform-aml-backend           "gunicorn -w 4 -k uv…"   5 minutes ago   Restarting (3) 46 seconds ago                            aml-fastapi-backend

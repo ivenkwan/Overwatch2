@@ -1,0 +1,330 @@
+graph TB
+    %% ============================================================
+    %% PROJECT OVERWATCH — LOGICAL ARCHITECTURE DIAGRAM
+    %% Converged Fiat & Stablecoin AML Platform (HKMA Regulated)
+    %% ============================================================
+
+    %% ── STYLING ───────────────────────────────────────────────
+    classDef external fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px,color:#1a237e
+    classDef ingress fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    classDef realtime fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef batch fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
+    classDef compliance fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    classDef data fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    classDef forensic fill:#ffebee,stroke:#b71c1c,stroke-width:3px,color:#b71c1c
+    classDef infra fill:#eceff1,stroke:#546e7a,stroke-width:2px,color:#263238
+    classDef frontend fill:#e0f7fa,stroke:#00838f,stroke-width:2px,color:#004d40
+    classDef monitoring fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#e65100
+    classDef topic fill:#ffffff,stroke:#78909c,stroke-width:1px,color:#37474f,stroke-dasharray: 5 5
+
+    %% ── EXTERNAL SYSTEMS ──────────────────────────────────────
+    subgraph EXTERNAL["🌐 EXTERNAL SYSTEMS & COUNTERPARTIES"]
+        direction LR
+        PAYMENTS["Payments Platform<br/>(Fiat TX Feed)"]:::external
+        BANKING["Banking Rails<br/>SWIFT · CHATS · FPS · ACH"]:::external
+        KYC["KYC Provider<br/>iAM Smart · Remote · Face-to-Face"]:::external
+        BLOCKCHAINS["Blockchain Networks<br/>ETH · TRON · BNB · Polygon · Solana"]:::external
+        BA_VENDOR["Blockchain Analytics Vendor<br/>Chainalysis · Elliptic · TRM"]:::external
+        SANCTIONS["Sanctions Provider<br/>OFAC SDN · UNSC · EU · HMT · HKMA"]:::external
+        TR_COUNTER["Travel Rule Counterparties<br/>IVMS101 · TRISA · OpenVASP"]:::external
+        JFIU["JFIU<br/>STREAMS2 (STR Filing)"]:::external
+        HKMA_PORTAL["HKMA<br/>Regulatory Returns Portal"]:::external
+    end
+
+    %% ── LOAD BALANCER / API GATEWAY ──────────────────────────
+    GATEWAY["API Gateway / LB<br/>(TLS Termination · Rate Limiting)"]:::infra
+
+    %% ── INGESTION LAYER ──────────────────────────────────────
+    subgraph INGEST["📥 INGESTION LAYER"]
+        direction LR
+        FIAT_INGEST["fiat-ingestion-service<br/>SWIFT/CHATS/FPS parsers<br/>Message queue consumers"]:::ingress
+        BLOCKCHAIN_INGEST["blockchain-indexer<br/>EVM log subscribers · Solana Geyser<br/>Block confirmations (12/32/64)"]:::ingress
+        INGEST_DLQ["Ingestion DLQ<br/>Dead Letter Queue<br/>Poison message replay"]:::ingress
+    end
+
+    %% ── KAFKA EVENT BACKBONE ─────────────────────────────────
+    subgraph KAFKA["📨 APACHE KAFKA — EVENT BACKBONE (15 Topics)"]
+        direction LR
+        K1["txn.raw.fiat"]:::topic
+        K2["txn.raw.stablecoin"]:::topic
+        K3["txn.canonical"]:::topic
+        K4["txn.screened"]:::topic
+        K5["aml.alert.realtime"]:::topic
+        K6["aml.alert.batch"]:::topic
+        K7["aml.case.event"]:::topic
+        K8["travelrule.request"]:::topic
+        K9["travelrule.response"]:::topic
+        K10["batch.scan.command"]:::topic
+        K11["batch.scan.result"]:::topic
+        K12["graph.sync.command"]:::topic
+        K13["forensic.event"]:::topic
+        K14["kpi.snapshot.command"]:::topic
+        K15["notification.event"]:::topic
+    end
+
+    %% ── REAL-TIME PROCESSING PIPELINE ────────────────────────
+    subgraph REALTIME["⚡ REAL-TIME PROCESSING PIPELINE (Sub-second)"]
+        direction TB
+
+        subgraph TME["Transaction Monitoring Engine"]
+            TME_RULES["tme-engine<br/>Rule evaluation (detection_scenario)<br/>Processing mode: REALTIME|BOTH<br/>JSONB threshold config"]:::realtime
+            TME_ML["tme-ml<br/>ML Ensemble Scoring<br/>XGBoost · Isolation Forest<br/>Anomaly detection"]:::realtime
+        end
+
+        SANCTIONS_SVC["sanctions-service<br/>Name + address fuzzy matching<br/>Watchlist cross-reference<br/>Real-time PEP check"]:::realtime
+
+        WALLET_ADAPTER["wallet-analytics-adapter<br/>BA risk score (0-100)<br/>Risk flags (mixer, darknet,<br/>ransomware, sanctions)<br/>Cache: 24h TTL Redis"]:::realtime
+
+        DECISION["Decision Engine<br/>Auto-Clear / Auto-Block / Escalate<br/>Risk score aggregation<br/>SLA tracking start"]:::realtime
+    end
+
+    %% ── T+1 BATCH PROCESSING PIPELINE ────────────────────────
+    subgraph BATCH["🕐 T+1 BATCH PROCESSING PIPELINE (Overnight)"]
+        direction TB
+
+        AIRFLOW["Apache Airflow DAG<br/>Trigger: 00:30 HKT daily<br/>business_date = T-1"]:::batch
+
+        BATCH_SVC["batch-scanning-service<br/>K8s Job Dispatcher<br/>Parallel analysis orchestrator<br/>Result aggregator"]:::batch
+
+        subgraph K8S_JOBS["10 Parallel K8s Jobs"]
+            direction LR
+            J1["Behavioral<br/>Baselining"]:::batch
+            J2["Peer Group<br/>Comparison"]:::batch
+            J3["Multi-Account<br/>Structuring"]:::batch
+            J4["Velocity<br/>Pattern Mining"]:::batch
+            J5["Network Graph<br/>Anomaly Detection"]:::batch
+            J6["Ensemble ML<br/>Scoring"]:::batch
+            J7["Rule Effectiveness<br/>Retrospective"]:::batch
+            J8["Cross-Rail<br/>Layering"]:::batch
+            J9["Sanctions<br/>Retrospective"]:::batch
+            J10["SAR<br/>Pre-Population"]:::batch
+        end
+
+        BATCH_RESULTS["Batch Results Aggregator<br/>batch_alert → CMS escalation<br/>kpi_snapshot + scenario_kpi<br/>graph_community refresh"]:::batch
+    end
+
+    %% ── COMPLIANCE & REGULATORY LAYER ────────────────────────
+    subgraph COMPLIANCE["🏛️ COMPLIANCE & REGULATORY LAYER"]
+        direction LR
+
+        TR_GW["travelrule-gateway<br/>Temporal Workflows<br/>IVMS101 · TRISA · OpenVASP<br/>HKD 8,000 threshold gate"]:::compliance
+
+        CMS["case-management-service<br/>Temporal Workflows<br/>Alert → Case → STR lifecycle<br/>RBAC: L1/L2/SUPERVISOR/MLRO<br/>SLA tracking + escalation"]:::compliance
+
+        REG_REPORT["regulatory-reporting-service<br/>JFIU STREAMS2 XML submission<br/>HKMA quarterly returns<br/>KPI auto-generation"]:::compliance
+    end
+
+    %% ── GRAPH ANALYTICS ──────────────────────────────────────
+    subgraph GRAPH["🔗 GRAPH ANALYTICS (Apache AGE)"]
+        GRAPH_BATCH["Batch Graph Algorithms<br/>PageRank · Louvain Community<br/>Cycle Detection · Shortest Path<br/>graph_analytics_run tracking"]:::batch
+        GRAPH_INTERACTIVE["Interactive Graph Exploration<br/>Analyst-initiated queries<br/>openCypher · GQL<br/>Suspicious cluster drill-down"]:::compliance
+    end
+
+    %% ── DATA LAYER ───────────────────────────────────────────
+    subgraph DATA["🗄️ DATA LAYER (VLAN Segmented)"]
+        direction LR
+
+        subgraph DATA_VLAN["Data VLAN"]
+            AML_CORE[("aml_core<br/>PostgreSQL 16<br/>27 operational tables<br/>Party · Account · Txn · Alert · Case · STR")]:::data
+            AML_AUDIT[("aml_audit<br/>PostgreSQL 16<br/>Append-only audit_log<br/>All CRUD + VIEW + EXPORT<br/>Immutable table design")]:::data
+            AML_GRAPH[("aml_graph<br/>PostgreSQL 16 + Apache AGE<br/>graph_node · graph_edge<br/>graph_community<br/>openCypher query engine")]:::data
+            AML_ANALYTICS[("aml_analytics<br/>TimescaleDB<br/>kpi_snapshot (hypertable)<br/>batch_behavioral_baseline (90d chunks)<br/>batch_peer_group")]:::data
+        end
+
+        subgraph FORENSIC_VLAN["Forensic VLAN (Isolated)"]
+            AML_FORENSIC[("aml_forensic<br/>PostgreSQL 16<br/>Tamper-proof ledger<br/>WORM: 4-layer enforcement<br/>Per-row SHA-256 hash<br/>Per-table Merkle tree<br/>Global hash chain")]:::forensic
+        end
+    end
+
+    %% ── FORENSIC AUDIT SUBSYSTEM ─────────────────────────────
+    subgraph FORENSIC["🔐 TAMPER-PROOF FORENSIC AUDIT SUBSYSTEM"]
+        direction TB
+
+        FORENSIC_SVC["forensic-audit-service<br/>Cryptographic hash sealing<br/>Merkle tree construction<br/>Periodic proof generation"]:::forensic
+
+        MERKLE["Merkle Tree Builder<br/>Per-table Merkle roots<br/>Global state root<br/>Hash chain linking<br/>(SHA-256)"]:::forensic
+
+        WORM["WORM Enforcement (4 Layers)<br/>① DB roles: INSERT-only, no UPDATE/DELETE<br/>② Row triggers: reject mutations<br/>③ Filesystem: chattr +i on data files<br/>④ S3 Object Lock: backup immutability"]:::forensic
+
+        WITNESS["External Witness Publishing<br/>Hourly: Polygon anchor (Keccak256)<br/>Hourly: Bitcoin testnet (OP_RETURN)<br/>Daily: Cloud KMS attestation<br/>Quarterly: Auditor-archived snapshot"]:::forensic
+
+        VERIFIER["Independent Verifier Tool<br/>CLI: reconstruct Merkle tree<br/>Compare roots vs. blockchain anchor<br/>Tamper detection report<br/>Auditor self-service"]:::forensic
+    end
+
+    %% ── FRONTEND ─────────────────────────────────────────────
+    subgraph FRONTEND["🖥️ AML ADMIN PORTAL"]
+        direction LR
+        NEXTJS["Next.js 14 SPA<br/>SSR + API Routes"]:::frontend
+        PORTAL_MODULES["Case Queue · Alert Triage<br/>STR Drafting · Graph Explorer<br/>KPI Dashboard · Audit Viewer<br/>Rule Config · User Admin"]:::frontend
+    end
+
+    %% ── AUTH ─────────────────────────────────────────────────
+    KEYCLOAK["Keycloak IAM<br/>RBAC: ANALYST_L1 · ANALYST_L2<br/>SUPERVISOR · MLRO<br/>GRAPH_ANALYST · ADMIN<br/>SAML/OIDC"]:::infra
+
+    %% ── INFRASTRUCTURE ───────────────────────────────────────
+    REDIS[("Redis Cluster<br/>Session cache<br/>Rate limiting<br/>Real-time counters<br/>BA risk cache (24h TTL)")]:::infra
+    MINIO[("MinIO<br/>Document storage<br/>STR evidence artifacts<br/>Audit report archives<br/>S3-compatible API")]:::infra
+
+    %% ── OBSERVABILITY ────────────────────────────────────────
+    subgraph OBSERV["📊 OBSERVABILITY STACK"]
+        direction LR
+        PROMETHEUS["Prometheus<br/>Metrics scraping<br/>Alert rules"]:::monitoring
+        GRAFANA["Grafana<br/>Dashboards<br/>HKMA KPI panels"]:::monitoring
+        LOKI["Loki<br/>Log aggregation<br/>Structured logging"]:::monitoring
+        TEMPO["Tempo<br/>Distributed tracing<br/>OpenTelemetry"]:::monitoring
+    end
+
+    %% ── DEPLOYMENT ───────────────────────────────────────────
+    subgraph DEPLOY["☸️ ON-PREM KUBERNETES CLUSTER"]
+        direction LR
+        APP_VLAN["App VLAN<br/>All microservices<br/>Airflow workers<br/>Temporal workers"]:::infra
+        DATA_VLAN2["Data VLAN<br/>PostgreSQL instances<br/>Kafka brokers<br/>Redis · MinIO"]:::infra
+        FORENSIC_VLAN2["Forensic VLAN<br/>Isolated network<br/>No egress except witness<br/>Jump host access only"]:::forensic
+        MON_VLAN["Monitoring VLAN<br/>Prometheus · Grafana<br/>Loki · Tempo<br/>AlertManager"]:::monitoring
+    end
+
+    %% ═══════════════════════════════════════════════════════════
+    %% CONNECTIONS
+    %% ═══════════════════════════════════════════════════════════
+
+    %% External → Ingestion
+    PAYMENTS --> FIAT_INGEST
+    BANKING --> FIAT_INGEST
+    BLOCKCHAINS --> BLOCKCHAIN_INGEST
+    BA_VENDOR --> WALLET_ADAPTER
+    SANCTIONS --> SANCTIONS_SVC
+    KYC --> GATEWAY
+
+    %% Ingestion → Kafka
+    FIAT_INGEST --> K1
+    BLOCKCHAIN_INGEST --> K2
+    FIAT_INGEST -->|Canonical transform| K3
+    BLOCKCHAIN_INGEST -->|Canonical transform + stablecoin_txn_detail| K3
+
+    %% Kafka → Real-Time Processing
+    K3 --> TME_RULES
+    K3 --> TME_ML
+    K3 --> SANCTIONS_SVC
+    K3 --> WALLET_ADAPTER
+    TME_RULES --> DECISION
+    TME_ML --> DECISION
+    SANCTIONS_SVC -->|screening_result| K4
+    SANCTIONS_SVC --> DECISION
+    WALLET_ADAPTER --> DECISION
+
+    %% Real-Time → Alert
+    DECISION -->|alert generated| K5
+    DECISION -->|screening escalation| K7
+
+    %% Kafka → Batch
+    K10 --> BATCH_SVC
+    AIRFLOW -->|Trigger DAG| K10
+    BATCH_SVC --> J1
+    BATCH_SVC --> J2
+    BATCH_SVC --> J3
+    BATCH_SVC --> J4
+    BATCH_SVC --> J5
+    BATCH_SVC --> J6
+    BATCH_SVC --> J7
+    BATCH_SVC --> J8
+    BATCH_SVC --> J9
+    BATCH_SVC --> J10
+    J1 & J2 & J3 & J4 & J5 & J6 & J7 & J8 & J9 & J10 --> BATCH_RESULTS
+    BATCH_RESULTS -->|batch_alert| K6
+    BATCH_RESULTS -->|kpi_snapshot + scenario_kpi| K14
+    BATCH_RESULTS -->|graph update| K12
+
+    %% Data Layer Reads/Writes
+    TME_RULES -.->|read scenarios| AML_CORE
+    TME_RULES -.->|write alerts| AML_CORE
+    TME_ML -.->|read features| AML_ANALYTICS
+    SANCTIONS_SVC -.->|read watchlist| AML_CORE
+    WALLET_ADAPTER -.->|cache BA scores| REDIS
+    DECISION -.->|write screening results| AML_CORE
+
+    BATCH_SVC -.->|read transactions| AML_CORE
+    BATCH_SVC -.->|read baselines| AML_ANALYTICS
+    J5 -.->|PageRank/Louvain| AML_GRAPH
+    BATCH_RESULTS -.->|write batch_alerts| AML_CORE
+    BATCH_RESULTS -.->|write KPIs| AML_ANALYTICS
+    BATCH_RESULTS -.->|refresh graph| AML_GRAPH
+
+    %% Case Management
+    K5 & K6 --> CMS
+    CMS -->|case events| K7
+    CMS -.->|read/write alerts/cases| AML_CORE
+    CMS -.->|case activity log| AML_AUDIT
+    CMS -->|STR ready| REG_REPORT
+    REG_REPORT --> JFIU
+    REG_REPORT --> HKMA_PORTAL
+
+    %% Graph Analytics
+    GRAPH_BATCH -.->|batch algorithms| AML_GRAPH
+    GRAPH_INTERACTIVE -.->|analyst queries| AML_GRAPH
+    GRAPH_BATCH -->|suspicious communities| K7
+    CMS -.->|case-linked graph| GRAPH_INTERACTIVE
+
+    %% Travel Rule
+    K3 -->|txn >= HKD 8,000| K8
+    K8 --> TR_GW
+    TR_GW --> TR_COUNTER
+    TR_COUNTER -->|counterparty response| K9
+    K9 --> TR_GW
+    TR_GW -.->|write travel_rule_record| AML_CORE
+    TR_GW -->|non-compliance alert| K5
+
+    %% Forensic Audit
+    K13 --> FORENSIC_SVC
+    AML_CORE -.->|audit triggers →| K13
+    AML_CORE -.->|audit triggers →| AML_AUDIT
+    FORENSIC_SVC --> MERKLE
+    MERKLE -.->|hash-sealed records| AML_FORENSIC
+    MERKLE --> WORM
+    WORM --> WITNESS
+    WITNESS -->|Polygon anchor| BLOCKCHAINS
+    VERIFIER -.->|verify integrity| AML_FORENSIC
+    VERIFIER -.->|compare vs. witness| BLOCKCHAINS
+
+    %% Frontend
+    GATEWAY --> NEXTJS
+    NEXTJS --> PORTAL_MODULES
+    PORTAL_MODULES -.->|REST API| CMS
+    PORTAL_MODULES -.->|read KPIs| AML_ANALYTICS
+    PORTAL_MODULES -.->|graph queries| GRAPH_INTERACTIVE
+    PORTAL_MODULES -.->|audit viewer| AML_AUDIT
+    PORTAL_MODULES -.->|forensic verifier| VERIFIER
+    NEXTJS --> KEYCLOAK
+
+    %% Auth
+    KEYCLOAK -.->|RBAC enforce| CMS
+    KEYCLOAK -.->|RBAC enforce| NEXTJS
+    KEYCLOAK -.->|user sync| AML_CORE
+
+    %% Infrastructure
+    REDIS -.->|session cache| NEXTJS
+    REDIS -.->|rate limit| GATEWAY
+    MINIO -.->|document store| CMS
+    MINIO -.->|audit archives| FORENSIC_SVC
+
+    %% Observability
+    APP_VLAN -.->|metrics| PROMETHEUS
+    DATA_VLAN2 -.->|metrics| PROMETHEUS
+    PROMETHEUS --> GRAFANA
+    APP_VLAN -.->|logs| LOKI
+    APP_VLAN -.->|traces| TEMPO
+    LOKI --> GRAFANA
+    TEMPO --> GRAFANA
+
+    %% Ingestion DLQ
+    FIAT_INGEST -->|poison messages| INGEST_DLQ
+    BLOCKCHAIN_INGEST -->|poison messages| INGEST_DLQ
+    INGEST_DLQ -.->|replay| FIAT_INGEST
+
+    %% Notification
+    K15 -->|email/Slack/Teams| GRAFANA
+
+    %% Deployment mapping
+    FIAT_INGEST & BLOCKCHAIN_INGEST & TME_RULES & TME_ML & SANCTIONS_SVC & WALLET_ADAPTER & DECISION & BATCH_SVC & CMS & TR_GW & REG_REPORT & FORENSIC_SVC & NEXTJS -.- APP_VLAN
+    AML_CORE & AML_AUDIT & AML_GRAPH & AML_ANALYTICS & KAFKA & REDIS & MINIO -.- DATA_VLAN2
+    AML_FORENSIC & MERKLE & WORM & WITNESS -.- FORENSIC_VLAN2
+    PROMETHEUS & GRAFANA & LOKI & TEMPO -.- MON_VLAN

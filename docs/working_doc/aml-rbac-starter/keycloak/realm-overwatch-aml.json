@@ -1,0 +1,116 @@
+{
+  "realm": "overwatch-aml",
+  "enabled": true,
+  "displayName": "Overwatch AML",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "roles": {
+    "realm": [
+      {"name": "platform_admin", "description": "Full cross-tenant platform administration"},
+      {"name": "tenant_admin", "description": "Tenant-level administration"},
+      {"name": "compliance_officer", "description": "Compliance leadership and approval authority"},
+      {"name": "auditor", "description": "Read-only audit persona"},
+      {"name": "investigator_lead", "description": "Lead investigator persona"},
+      {"name": "service_etl", "description": "ETL service principal"},
+      {"name": "service_rules_engine", "description": "Rules engine service principal"},
+      {
+        "name": "aml_platform_superuser",
+        "description": "Composite platform superuser",
+        "composite": true,
+        "composites": {
+          "realm": ["platform_admin", "compliance_officer", "auditor"]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "aml-api",
+      "name": "AML API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "optionalClientScopes": ["offline_access"],
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "tenant_id",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String"
+          }
+        }
+      ],
+      "roles": [
+        {"name": "dashboard.view", "description": "View dashboard"},
+        {"name": "alerts.view", "description": "View alerts"},
+        {"name": "alerts.triage", "description": "Triage alerts"},
+        {"name": "alerts.escalate", "description": "Escalate alerts"},
+        {"name": "cases.view", "description": "View cases"},
+        {"name": "cases.create", "description": "Create cases"},
+        {"name": "cases.assign", "description": "Assign cases"},
+        {"name": "cases.edit", "description": "Edit cases"},
+        {"name": "cases.review", "description": "Review cases"},
+        {"name": "cases.approve", "description": "Approve cases"},
+        {"name": "cases.close", "description": "Close cases"},
+        {"name": "evidence.upload", "description": "Upload evidence"},
+        {"name": "graph.view", "description": "View graph workspace"},
+        {"name": "graph.expand", "description": "Expand graph workspace"},
+        {"name": "screening.view", "description": "View screening hits"},
+        {"name": "screening.review", "description": "Review screening hits"},
+        {"name": "str.create", "description": "Create STR"},
+        {"name": "str.approve", "description": "Approve STR"},
+        {"name": "users.view", "description": "View users"},
+        {"name": "users.manage", "description": "Manage users"},
+        {"name": "rbac.manage", "description": "Manage RBAC"},
+        {"name": "rules.view", "description": "View rules"},
+        {"name": "rules.manage", "description": "Manage rules"},
+        {"name": "etl.monitor", "description": "Monitor ETL"}
+      ]
+    },
+    {
+      "clientId": "aml-web",
+      "name": "AML Web App",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "https://aml.example.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "https://aml.example.com"
+      ],
+      "defaultClientScopes": ["profile", "email", "roles"]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    }
+  ]
+}

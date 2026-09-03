@@ -1,0 +1,64 @@
+flowchart TD
+classDef data fill:#0d2030,stroke:#0ea5e9,color:#e6edf3
+classDef ml fill:#1a1a3e,stroke:#818cf8,color:#e6edf3
+classDef human fill:#0d3320,stroke:#22c55e,color:#e6edf3
+classDef governance fill:#3d2700,stroke:#f59e0b,color:#e6edf3
+classDef tuning fill:#1e1030,stroke:#a855f7,color:#e6edf3
+classDef external fill:#2d1515,stroke:#ef4444,color:#e6edf3
+
+subgraph DATA["DATA FOUNDATION"]
+    D1["Transaction Data Lake<br/>Fiat and Stablecoin<br/>Partitioned by date"]:::data
+    D2["Alert Outcome Store<br/>FP TP Inconclusive<br/>Disposition and notes"]:::data
+    D3["KYC and CDD Data<br/>Customer profiles<br/>Risk ratings"]:::data
+    D4["External Intelligence<br/>FINEST consortium<br/>JFIU typology reports<br/>FATF advisories"]:::external
+end
+
+subgraph HITL["HUMAN IN THE LOOP FEEDBACK LAYER"]
+    H1["L1 Disposition Capture<br/>FP reason codes<br/>Closure rationale tags"]:::human
+    H2["L2 Investigation Outcomes<br/>ML typology labels<br/>Evidence quality score"]:::human
+    H3["MLRO STR Decisions<br/>STR filed or not filed<br/>Risk factor weighting"]:::human
+    H4["QA Sample Review<br/>10 pct auto-discard validation<br/>Accuracy audit"]:::human
+    H5["Analyst Feedback Tags<br/>Rule improvement notes<br/>Threshold suggestions"]:::human
+end
+
+subgraph ML_LAYER["ML MODEL LAYER"]
+    ML1["Alert Risk Scorer<br/>Behavioural baseline<br/>Anomaly detection<br/>Entity embedding"]:::ml
+    ML2["Auto-Discard Model<br/>Low-risk suppression<br/>Configurable threshold"]:::ml
+    ML3["Entity Resolution<br/>Fuzzy name matching<br/>UBO graph inference"]:::ml
+    ML4["STR Narrative Gen<br/>GenAI draft creation<br/>HKMA GenAI Sandbox"]:::ml
+    ML5["Champion-Challenger<br/>A B model comparison<br/>Held-out test set"]:::ml
+end
+
+subgraph TUNING["PERIODIC TUNING CYCLE"]
+    T1["Daily KPI Monitoring<br/>Alert volume<br/>FP rate SLA adherence"]:::tuning
+    T2["Monthly Scenario Review<br/>Per-rule FP rate<br/>True positive rate<br/>STR conversion rate"]:::tuning
+    T3["Annual TM Tuning Report<br/>Statistical calibration<br/>Above below the line test<br/>Sensitivity analysis"]:::tuning
+    T4["Trigger Event Review<br/>Alert surge New typology<br/>Product change Reg update"]:::tuning
+    T5["Threshold Adjustment<br/>Increase Decrease<br/>Segment split New scenario"]:::tuning
+end
+
+subgraph GOVERNANCE["MODEL GOVERNANCE AND OVERSIGHT"]
+    G1["Model Validation<br/>Independent review<br/>Data lineage test<br/>Reconciliation check"]:::governance
+    G2["AML Committee Approval<br/>Proposed changes reviewed<br/>Quarterly KPI report"]:::governance
+    G3["Explainability Audit<br/>Model logic documented<br/>Decision rationale traceable"]:::governance
+    G4["Regulatory Submission<br/>HKMA AI feasibility report<br/>Model change log"]:::governance
+    G5["Independent Audit<br/>Direct line to senior mgt<br/>Annual AML CFT review"]:::governance
+end
+
+D1 & D2 & D3 & D4 --> H1 & H2 & H3 & H4 & H5
+H1 & H2 & H3 & H4 & H5 --> ML1 & ML2 & ML3
+H3 --> ML4
+ML1 & ML2 --> ML5
+ML5 -->|Champion wins| ML1
+ML5 -->|Challenger wins| ML2
+H1 & H2 --> T1
+T1 --> T2 --> T3
+T4 -.->|ad hoc trigger| T3
+T3 --> T5
+T5 --> ML1 & ML2
+T5 --> G1
+G1 --> G2 --> G3
+G3 --> G4 --> G5
+G5 -->|Findings| T4
+ML4 -->|Draft STR narrative| H3
+G2 -->|Approved changes| D1

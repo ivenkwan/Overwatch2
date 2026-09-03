@@ -1,0 +1,19 @@
+,Unnamed: 0,Unnamed: 1,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6,Unnamed: 7,Unnamed: 8,Unnamed: 9,Unnamed: 10
+0,,KPI Dictionary,,,,,,,,,
+1,,,,,,,,,,,
+2,,KPI,Definition,Formula,Owner,Green,Amber,Red,Frequency,Source data,Rationale
+3,,Alert rate,"Alerts per 1,000 active monitored relationships","(Alert Count / Active Relationships) x 1,000",AML Monitoring,Baseline,>10% MoM variance,>20% MoM variance,Monthly,Alert count; active customers/accounts/wallets,Coverage and demand signal
+4,,Productive alert rate,Reviewed alerts escalated to case,Cases Opened / Reviewed Alerts,AML Monitoring Lead,>=10.0%,5.0%-9.9%,<5.0%,Monthly,Case opens; reviewed alerts,Scenario usefulness
+5,,False positive rate,Reviewed alerts closed non-suspicious,Closed Non-Suspicious / Reviewed Alerts,TM Tuning Manager,<=90.0%,90.1%-95.0%,>95.0%,Monthly,Alert dispositions,Efficiency and tuning
+6,,STR conversion rate,STRs filed over productive cases,STR Filed / Cases Closed Productive,MLRO,>=10.0%,5.0%-9.9%,<5.0%,Monthly,STR count; productive cases,HKMA tuning KPI
+7,,First-review SLA,Alerts reviewed within internal SLA,Alerts Within SLA / Total Alerts,Operations Manager,>=95.0%,90.0%-94.9%,<90.0%,Daily/Weekly,Workflow timestamps,Timeliness control
+8,,Backlog ageing,Open alerts past SLA,Open Alerts Over SLA / Open Alerts,Operations Manager,<=10.0%,10.1%-20.0%,>20.0%,Daily/Weekly,Open queue ageing,Escalation trigger
+9,,Case cycle time,Average days from case open to disposition,Total Case Days / Cases Closed,Investigations Lead,<=10,11-20,>20,Monthly,Case timestamps,Investigation efficiency
+10,,STR timeliness,Days from suspicion formed to STR submission,Total STR Days / STR Filed,MLRO,<=3,4-5,>5,Weekly/Monthly,STR timestamps,As soon as practicable
+11,,STR completeness,STRs with all mandatory fields complete,Complete STRs / STR Filed,Quality Assurance,>=99.0%,95.0%-98.9%,<95.0%,Monthly,QA checklist,Reporting quality
+12,,Digital footprint inclusion,Relevant STRs with cyber indicators included,Cyber STRs with Footprints / Relevant Cyber STRs,MLRO / FIU,>=90.0%,80.0%-89.9%,<80.0%,Monthly,Case/STR fields,HKMA cyber context
+13,,Editable attachment rate,STRs with editable transaction annexures,Editable Annexures / STR Filed,FIU Manager,>=95.0%,90.0%-94.9%,<90.0%,Monthly,STR package metadata,JFIU usability
+14,,Data quality exception rate,Failed critical data checks,Critical Data Failures / Critical Records,Data Governance,<=1.0%,1.1%-3.0%,>3.0%,Daily/Weekly,Ingestion QC logs,Monitoring reliability
+15,,Scenario review coverage,Scenarios reviewed in period,Scenarios Reviewed / Active Scenarios,TM Tuning Manager,100.0% annual,<100.0% annual,Material gap,Monthly/Quarterly,Scenario inventory,Periodic review
+16,,QA clearance defect rate,QA exceptions on alert closures,QA Exceptions / QA Sample,Quality Assurance,<=5.0%,5.1%-10.0%,>10.0%,Monthly,QA review log,Decision quality
+17,,Screening false positive rate,Screening alerts cleared as false matches,False Screening Hits / Total Screening Hits,Screening Lead,Portfolio baseline,>10% above baseline,>20% above baseline,Monthly,Screening results,Name/wallet tuning

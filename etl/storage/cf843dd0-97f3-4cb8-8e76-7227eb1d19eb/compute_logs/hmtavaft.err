@@ -1,0 +1,5 @@
+2026-04-06 13:28:50 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72773 - LOGS_CAPTURED - Started capturing logs in process (pid: 72773).
+2026-04-06 13:28:50 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72773 - update_age_graph - STEP_START - Started execution of step "update_age_graph".
+2026-04-06 13:28:51 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72773 - update_age_graph - STEP_OUTPUT - Yielded output "result" of type "Nothing". (Type check passed).
+2026-04-06 13:28:51 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72773 - update_age_graph - ASSET_MATERIALIZATION - Materialized value update_age_graph.
+2026-04-06 13:28:51 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72773 - update_age_graph - STEP_SUCCESS - Finished execution of step "update_age_graph" in 1.13s.

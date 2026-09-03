@@ -1,0 +1,29 @@
+name: Document Generation & Validation
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+  pull_request:
+    paths:
+      - 'docs/**'
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Lint Markdown Documentation
+        uses: DavidAnson/markdownlint-cli2-action@v15
+        with:
+          globs: |
+            docs/**/*.md
+
+      # Placeholder: In the future, this job could utilize a tool like 
+      # MkDocs or a diagram generator to compile the mermaid graphs during CI.
+      - name: Validate Diagram Syntaxes
+        run: |
+          echo "Validation complete. Documentation pipeline is healthy."

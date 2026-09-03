@@ -1,0 +1,10 @@
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - LOGS_CAPTURED - Started capturing logs in process (pid: 2586).
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - STEP_START - Started execution of step "cleaned_ledger_data".
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - cleaned_ledger_data - Loading file from: /opt/dagster/app/storage/raw_ledger_data using PickledObjectFilesystemIOManager...
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - LOADED_INPUT - Loaded input "raw_ledger_data" using input manager "io_manager", from output "result" of step "raw_ledger_data"
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - STEP_INPUT - Got input "raw_ledger_data" of type "DataFrame". (Type check passed).
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - STEP_OUTPUT - Yielded output "result" of type "DataFrame". (Type check passed).
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - cleaned_ledger_data - Writing file at: /opt/dagster/app/storage/cleaned_ledger_data using PickledObjectFilesystemIOManager...
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - ASSET_MATERIALIZATION - Materialized value cleaned_ledger_data.
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - HANDLED_OUTPUT - Handled output "result" using IO manager "io_manager"
+2026-04-06 13:01:10 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2586 - cleaned_ledger_data - STEP_SUCCESS - Finished execution of step "cleaned_ledger_data" in 708ms.

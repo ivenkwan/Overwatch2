@@ -1,0 +1,10 @@
+2026-04-07 12:09:21 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - LOGS_CAPTURED - Started capturing logs in process (pid: 69863).
+2026-04-07 12:09:21 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - STEP_START - Started execution of step "rename_to_ok".
+2026-04-07 12:09:21 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - rename_to_ok - Loading file from: /opt/dagster/app/storage/d94d4d58-b726-438d-9b35-8b1e05fe562d/update_graph_model/result using PickledObjectFilesystemIOManager...
+2026-04-07 12:09:21 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - LOADED_INPUT - Loaded input "filepath" using input manager "io_manager", from output "result" of step "update_graph_model"
+2026-04-07 12:09:21 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - STEP_INPUT - Got input "filepath" of type "String". (Type check passed).
+2026-04-07 12:09:21 +0000 - dagster - INFO - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - rename_to_ok - Workflow Complete. Input file protected and renamed to: /opt/dagster/input_data/20260407_CUST_TNG.csv.OK
+2026-04-07 12:09:22 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - STEP_OUTPUT - Yielded output "result" of type "Any". (Type check passed).
+2026-04-07 12:09:22 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - rename_to_ok - Writing file at: /opt/dagster/app/storage/d94d4d58-b726-438d-9b35-8b1e05fe562d/rename_to_ok/result using PickledObjectFilesystemIOManager...
+2026-04-07 12:09:22 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - HANDLED_OUTPUT - Handled output "result" using IO manager "io_manager"
+2026-04-07 12:09:22 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69863 - rename_to_ok - STEP_SUCCESS - Finished execution of step "rename_to_ok" in 412ms.

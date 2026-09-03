@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AML Workflow & Continuous Improvement — HK AMLO</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #c9d1d9;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #e6edf3;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .tab-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 12px;
+  }
+  .tab-btn {
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { background: #1f2937; color: #c9d1d9; }
+  .tab-btn.active {
+    background: #1e3a5f;
+    border-color: #388bfd;
+    color: #e6edf3;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 15px;
+    color: #e6edf3;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #161b22;
+    border-left: 3px solid #388bfd;
+    border-radius: 0 6px 6px 0;
+  }
+  .mermaid {
+    background: #0d1117;
+    padding: 10px;
+    overflow-x: auto;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #161b22;
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  .leg { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  
+  /* FIXED: Bounding box size workaround for hidden Mermaid SVGs */
+  .tab-content {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+    visibility: hidden;
+    width: 100%;
+  }
+  .tab-content.active {
+    position: static;
+    visibility: visible;
+  }
+</style>
+</head>
+<body>
+<h1>AML Detection, Alert Review & STR Filing — HK AMLO Workflow Framework</h1>
+<p class="subtitle">AMLO Cap.615 · Stablecoins Ordinance Cap.656 · HKMA AML/CFT Guideline · JFIU STREAMS 2 · HKMA AI Circular Nov 2025</p>
+
+<div class="legend">
+  <div class="leg"><div class="dot" style="background:#1e3a5f;border:1px solid #388bfd"></div> System / Engine</div>
+  <div class="leg"><div class="dot" style="background:#0d3320;border:1px solid #2ea043"></div> Human Process</div>
+  <div class="leg"><div class="dot" style="background:#3d2700;border:1px solid #e3a008"></div> Decision Point</div>
+  <div class="leg"><div class="dot" style="background:#3d1a00;border:1px solid #e05c1a"></div> Alert / Flag</div>
+  <div class="leg"><div class="dot" style="background:#3d0014;border:1px solid #f85149"></div> Regulatory / JFIU</div>
+  <div class="leg"><div class="dot" style="background:#1a1a3e;border:1px solid #818cf8"></div> ML Model</div>
+</div>
+
+<div class="tab-nav">
+<button class="tab-btn active" onclick="showTab('lifecycle')" id="btn-lifecycle">End-to-End AML Detection Lifecycle</button>
+<button class="tab-btn" onclick="showTab('swimlane')" id="btn-swimlane">L1 / L2 / L3 Review Swimlane</button>
+<button class="tab-btn" onclick="showTab('str_workflow')" id="btn-str_workflow">STR Filing Workflow — JFIU STREAMS 2</button>
+<button class="tab-btn" onclick="showTab('ci_framework')" id="btn-ci_framework">Continuous Improvement & Human-in-the-Loop</button>
+<button class="tab-btn" onclick="showTab('kpi_dashboard')" id="btn-kpi_dashboard">HKMA KPI Framework & Reporting Cycle</button>
+</div>
+
+<div id="tab-lifecycle" class="tab-content active">
+  <h2>End-to-End AML Detection Lifecycle</h2>
+  <div class="mermaid">flowchart TD
+    classDef system fill:#1e3a5f,stroke:#388bfd,color:#e6edf3,font-size:13px
+    classDef process fill:#0d3320,stroke:#2ea043,color:#e6edf3,font-size:13px
+    classDef decision fill:#3d2700,stroke:#e3a008,color:#e6edf3,font-size:13px
+    classDef alert fill:#3d1a00,stroke:#e05c1a,color:#e6edf3,font-size:13px
+    classDef regulatory fill:#3d0014,stroke:#f85149,color:#e6edf3,font-size:13px
+    classDef closed fill:#1a1a1a,stroke:#555,color:#aaa,font-size:13px
+
+    subgraph INGEST["① TRANSACTION INGESTION"]
+        direction LR
+        T1["Fiat Transaction<br/>SWIFT / FPS / CHATS<br/>JETCO / ACH / RTGS"]:::system
+        T2["Stablecoin / VA Transaction<br/>On-chain transfer<br/>Mint / Redeem / Swap"]:::system
+        T3["Transaction Enrichment<br/>HKD normalisation<br/>FX conversion<br/>Country code"]:::process
+    end
+
+    subgraph SCREEN["② REAL-TIME SCREENING"]
+        direction LR
+        S1["Sanctions Screening<br/>OFAC · UNSC · EU · HMT<br/>HKMA Designated"]:::alert
+        S2["PEP Screening<br/>Domestic · Foreign · IO<br/>Family members"]:::alert
+        S3["Blockchain Analytics<br/>Chainalysis · Elliptic<br/>Risk score 0–100"]:::alert
+        S4["Travel Rule Check<br/>Zero-threshold stablecoin<br/>HKD 8,000 data req."]:::alert
+    end
+
+    subgraph DET["③ DETECTION ENGINE"]
+        direction LR
+        D1["Real-Time Rules<br/>Sanctions match<br/>High-value &gt; HKD 1M<br/>Travel Rule breach<br/>Rapid layering"]:::system
+        D2["T+1 Batch Rules<br/>Structuring 30-day window<br/>Velocity vs baseline<br/>Dormant reactivation<br/>PEP enhanced monitoring"]:::system
+        D3["ML Risk Scoring<br/>Behavioural analytics<br/>Anomaly detection<br/>Alert prioritisation"]:::system
+    end
+
+    subgraph ALERT_MGMT["④ ALERT TRIAGE — L1 REVIEW"]
+        A1["Alert Generated<br/>Rule / Scenario code<br/>Risk score 0–100<br/>SLA timer started"]:::alert
+        A2{"Auto-Discard?<br/>ML score low<br/>&lt; threshold"}:::decision
+        A3["L1 Analyst Review<br/>KYC profile check<br/>Expected behaviour<br/>False positive test"]:::process
+        A4{"Clear as<br/>False Positive?"}:::decision
+        A5["Sample QA Check<br/>10% of auto-discards<br/>validated by L2"]:::process
+        A6["Escalate to L2<br/>Case intake<br/>Alert package"]:::process
+    end
+
+    subgraph INVEST["⑤ L2 INVESTIGATION"]
+        I1["Transaction Pattern Analysis<br/>Structuring / Layering<br/>Velocity / Round-tripping"]:::process
+        I2["Customer Profile Review<br/>KYC · EDD · Source of wealth<br/>Occupation vs activity"]:::process
+        I3["Network Analysis<br/>UBO chain · Counterparties<br/>Graph traversal"]:::process
+        I4["OSINT & External Checks<br/>Adverse news · Court orders<br/>LEA enquiries · Sanctions"]:::process
+        I5["EDD / RFI<br/>Request for Information<br/>Customer enquiry"]:::process
+        I6{"Satisfactory<br/>Explanation?"}:::decision
+        I7["Document Findings<br/>Case narrative<br/>Evidence pack"]:::process
+        I8["Recommend STR Filing<br/>Escalate to MLRO/L3"]:::alert
+        I9["Close Case<br/>No Suspicion<br/>Document rationale"]:::closed
+    end
+
+    subgraph MLRO["⑥ MLRO DECISION — L3"]
+        M1["MLRO Review<br/>Validate L2 findings<br/>Apply SAFE test"]:::regulatory
+        M2{"Reasonable<br/>Grounds for<br/>Suspicion?"}:::decision
+        M3["No STR — Monitor<br/>Update risk rating<br/>Enhanced monitoring"]:::process
+        M4["Approve STR Filing<br/>Sign-off<br/>Tipping-off check"]:::regulatory
+    end
+
+    subgraph STR_FILING["⑦ STR FILING — JFIU STREAMS 2"]
+        direction LR
+        F1["Draft STR<br/>Subject details<br/>Suspicious activity narrative<br/>Transaction refs"]:::regulatory
+        F2["Internal Approval<br/>Compliance Officer sign-off<br/>Board notification if critical"]:::regulatory
+        F3["Submit via STREAMS 2<br/>XML · PDF · Web form<br/>HK Post e-cert required"]:::regulatory
+        F4["JFIU Acknowledgement<br/>Reference number assigned<br/>Intelligence disseminated"]:::regulatory
+        F5["Post-STR Controls<br/>Enhanced monitoring<br/>No tipping-off<br/>Consider relationship exit"]:::regulatory
+    end
+
+    subgraph POSTACT["⑧ POST-ACTION & RECORD KEEPING"]
+        direction LR
+        R1["Update Customer Risk Rating<br/>CDD / EDD refresh"]:::process
+        R2["Record Retention<br/>6+ years AMLO requirement"]:::process
+        R3["Regulatory Reporting<br/>HKMA supervisory returns<br/>Quarterly KPI to AML Committee"]:::process
+        R4["Feedback Loop<br/>Alert outcome → ML model<br/>Scenario tuning signal"]:::process
+    end
+
+    T1 --> T3
+    T2 --> T3
+    
+    T3 --> S1
+    T3 --> S2
+    T3 --> S3
+    T3 --> S4
+    
+    S1 --> D1
+    S1 --> D2
+    S2 --> D1
+    S2 --> D2
+    S3 --> D1
+    S3 --> D2
+    S4 --> D1
+    S4 --> D2
+    
+    D1 --> D3
+    D2 --> D3
+    
+    D3 --> A1
+    
+    A1 --> A2
+    A2 -->|Yes - auto-discard| A5
+    A2 -->|No - queue for L1| A3
+    
+    A5 -->|Pass| R4
+    A5 -->|QA fail| A3
+    
+    A3 --> A4
+    A4 -->|Yes - close FP| R4
+    A4 -->|No - escalate| A6
+    
+    A6 --> I1
+    A6 --> I2
+    A6 --> I3
+    A6 --> I4
+    
+    I5 -. "if needed" .-> I2
+    
+    I1 --> I6
+    I2 --> I6
+    I3 --> I6
+    I4 --> I6
+    
+    I6 -->|Yes| I9
+    I6 -->|No| I7
+    
+    I7 --> I8
+    I8 --> M1
+    M1 --> M2
+    
+    M2 -->|No| M3
+    M3 --> R1
+    
+    M2 -->|Yes| M4
+    M4 --> F1
+    F1 --> F2
+    F2 --> F3
+    F3 --> F4
+    F4 --> F5
+    
+    F5 --> R1
+    I9 --> R1
+    
+    R1 --> R2
+    R1 --> R3
+    R1 --> R4
+</div>
+</div>
+
+<div id="tab-swimlane" class="tab-content">
+  <h2>L1 / L2 / L3 Review Swimlane</h2>
+  <div class="mermaid">sequenceDiagram
+    autonumber
+    participant TMS as Transaction Monitoring System
+    participant L1 as L1 Analyst (Alert Triage)
+    participant L2 as L2 Investigator (Case Analysis)
+    participant MLRO as MLRO / L3 (Compliance Decision)
+    participant JFIU as JFIU (STREAMS 2)
+    participant AUDIT as Audit Log
+
+    TMS->>L1: Alert generated (rule code, risk score, SLA)
+    Note over TMS,L1: Real-time: immediate<br/>Batch: next business day T+1
+
+    L1->>L1: Check KYC profile vs transaction
+    L1->>L1: Review prior alerts & risk history
+
+    alt False Positive
+        L1->>TMS: Close alert — document rationale
+        L1->>AUDIT: Log: FP decision + evidence
+    else Genuine Concern
+        L1->>L2: Escalate — alert package + initial notes
+        L1->>AUDIT: Log: escalation reason
+    end
+
+    L2->>L2: Transaction pattern analysis
+    L2->>L2: OSINT / adverse media / PEP check
+    L2->>L2: Network graph — UBO / counterparties
+    L2->>L2: Blockchain analytics (if VA/stablecoin)
+
+    opt RFI Required
+        L2->>L2: Customer RFI (internal only — no tipping off)
+        Note over L2: Must NOT reveal STR investigation<br/>Cap.405 s.25A tipping-off prohibition
+    end
+
+    alt Explanation Satisfactory
+        L2->>TMS: Close case — no grounds for suspicion
+        L2->>AUDIT: Log: closure rationale + evidence
+    else Suspicion Remains
+        L2->>MLRO: Escalate with full investigation pack
+        L2->>AUDIT: Log: STR recommendation + basis
+    end
+
+    MLRO->>MLRO: Apply SAFE test<br/>(Screen · Ask · Find · Evaluate)
+    MLRO->>MLRO: Review L2 findings & evidence
+    MLRO->>MLRO: Validate tipping-off controls
+
+    alt No Reasonable Grounds
+        MLRO->>TMS: Close — enhanced monitoring flag set
+        MLRO->>AUDIT: Log: MLRO decision + rationale
+    else Reasonable Grounds for Suspicion
+        MLRO->>MLRO: Approve STR filing
+        MLRO->>JFIU: Submit STR via STREAMS 2<br/>(XML / PDF / Web form)
+        JFIU-->>MLRO: Acknowledgement + JFIU ref no.
+        MLRO->>TMS: Flag account: post-STR monitoring
+        MLRO->>AUDIT: Log: STR ref, submission ts, approver
+        Note over MLRO,JFIU: No Tipping Off — customer<br/>must NOT be informed
+    end
+
+    MLRO->>L2: Feedback: STR outcome / learning points
+    L2->>L1: Feedback: scenario tuning signals
+    L1->>TMS: Request threshold / rule adjustment (if pattern)
+</div>
+</div>
+
+<div id="tab-str_workflow" class="tab-content">
+  <h2>STR Filing Workflow — JFIU STREAMS 2</h2>
+  <div class="mermaid">flowchart TD
+    classDef trigger fill:#1e3a5f,stroke:#388bfd,color:#e6edf3
+    classDef prep fill:#0d3320,stroke:#2ea043,color:#e6edf3
+    classDef approval fill:#3d2700,stroke:#e3a008,color:#e6edf3
+    classDef submission fill:#3d0014,stroke:#f85149,color:#e6edf3
+    classDef postfiling fill:#1a1a2e,stroke:#7c3aed,color:#e6edf3
+    classDef legal fill:#2d1515,stroke:#db2777,color:#e6edf3
+
+    START_NODE(["MLRO approves STR filing<br/>Reasonable grounds confirmed"]):::trigger
+
+    subgraph PREP["STR PREPARATION"]
+        P1["Compile subject details<br/>Name · HKID / Passport · DOB<br/>Address · Occupation · Salary<br/>Source of wealth / Source of funds"]:::prep
+        P2["Document suspicious activity<br/>Narrative: what happened<br/>When · How much · Pattern"]:::prep
+        P3["State reasons for suspicion<br/>SAFE approach indicators<br/>Red flags identified<br/>Rule / typology reference"]:::prep
+        P4["Attach transaction references<br/>All flagged txn IDs<br/>Time period · HKD amounts"]:::prep
+        P5["Specify applicable ordinances<br/>Cap.405 DTROP<br/>Cap.455 OSCO<br/>Cap.575 UNATMO"]:::legal
+        P6["Tipping-off risk review<br/>Customer contact freeze<br/>Internal need-to-know only"]:::legal
+    end
+
+    subgraph APPROVAL["INTERNAL APPROVAL"]
+        A1["Compliance Officer review<br/>Validate completeness<br/>Check narrative quality"]:::approval
+        A2{"Approved?"}:::approval
+        A3["Return to L2 / MLRO<br/>Additional evidence needed"]:::approval
+        A4["Board notification<br/>if critical / large amount<br/>or systemic risk"]:::approval
+    end
+
+    subgraph SUBMIT["SUBMISSION — JFIU STREAMS 2"]
+        S1{"Submission method"}:::submission
+        S2["XML Submission<br/>System-to-system<br/>HK Post e-cert required"]:::submission
+        S3["PDF Upload<br/>Structured PDF form<br/>HK Post e-cert required"]:::submission
+        S4["Web Form<br/>Direct STREAMS 2 input<br/>No e-cert needed"]:::submission
+        S5["JFIU Receipt<br/>Acknowledgement email<br/>JFIU reference number"]:::submission
+    end
+
+    subgraph POST_FILING["POST-FILING OBLIGATIONS"]
+        Q1["Update case record<br/>STR reference logged<br/>Timestamp recorded"]:::postfiling
+        Q2["Enhanced account monitoring<br/>Alert thresholds lowered<br/>Transaction holds if needed"]:::postfiling
+        Q3["No tipping-off maintained<br/>Customer NOT informed<br/>Internal communications restricted"]:::legal
+        Q4{"JFIU follow-up<br/>request?"}:::postfiling
+        Q5["Respond to JFIU<br/>Provide additional info<br/>Law enforcement liaison"]:::postfiling
+        Q6["Consider exit relationship<br/>Based on risk assessment<br/>Document rationale"]:::postfiling
+        Q7["Supplemental STR<br/>if new evidence emerges"]:::submission
+        Q8["Record retention<br/>6+ years from transaction date<br/>AMLO Cap.615 requirement"]:::legal
+    end
+
+    START_NODE --> P1
+    START_NODE --> P2
+    START_NODE --> P3
+    START_NODE --> P4
+    START_NODE --> P5
+    
+    P5 --> P6
+    
+    P1 --> A1
+    P2 --> A1
+    P3 --> A1
+    P4 --> A1
+    P6 --> A1
+    
+    A1 --> A2
+    A2 -->|No| A3
+    A3 --> P1
+    
+    A2 -->|Yes| A4
+    A4 --> S1
+    
+    S1 -->|High volume / automated| S2
+    S1 -->|Standard| S3
+    S1 -->|Ad-hoc| S4
+    
+    S2 --> S5
+    S3 --> S5
+    S4 --> S5
+    
+    S5 --> Q1
+    
+    Q1 --> Q2
+    Q1 --> Q3
+    
+    Q2 --> Q4
+    Q4 -->|Yes| Q5
+    Q5 --> Q7
+    
+    Q4 -->|No| Q6
+    Q6 --> Q8
+    Q7 --> Q8
+</div>
+</div>
+
+<div id="tab-ci_framework" class="tab-content">
+  <h2>Continuous Improvement & Human-in-the-Loop</h2>
+  <div class="mermaid">flowchart TD
+    classDef data fill:#0d2030,stroke:#0ea5e9,color:#e6edf3,font-size:12px
+    classDef ml fill:#1a1a3e,stroke:#818cf8,color:#e6edf3,font-size:12px
+    classDef human fill:#0d3320,stroke:#22c55e,color:#e6edf3,font-size:12px
+    classDef governance fill:#3d2700,stroke:#f59e0b,color:#e6edf3,font-size:12px
+    classDef tuning fill:#1e1030,stroke:#a855f7,color:#e6edf3,font-size:12px
+    classDef external fill:#2d1515,stroke:#ef4444,color:#e6edf3,font-size:12px
+
+    subgraph DATA["DATA FOUNDATION"]
+        D1["Transaction Data Lake<br/>Fiat + Stablecoin<br/>Partitioned by date"]:::data
+        D2["Alert Outcome Store<br/>FP / TP / Inconclusive<br/>Disposition + notes"]:::data
+        D3["KYC / CDD Data<br/>Customer profiles<br/>Risk ratings"]:::data
+        D4["External Intelligence<br/>FINEST consortium<br/>JFIU typology reports<br/>FATF advisories"]:::external
+    end
+
+    subgraph HITL["HUMAN-IN-THE-LOOP FEEDBACK LAYER"]
+        direction TB
+        H1["L1 Disposition Capture<br/>FP reason codes<br/>Closure rationale tags"]:::human
+        H2["L2 Investigation Outcomes<br/>ML typology labels<br/>Evidence quality score"]:::human
+        H3["MLRO STR Decisions<br/>STR filed / not filed<br/>Risk factor weighting"]:::human
+        H4["QA Sample Review<br/>10% auto-discard validation<br/>Accuracy audit"]:::human
+        H5["Analyst Feedback Tags<br/>Rule improvement notes<br/>Threshold suggestions"]:::human
+    end
+
+    subgraph ML_LAYER["ML MODEL LAYER"]
+        direction LR
+        ML1["Alert Risk Scorer<br/>Behavioural baseline<br/>Anomaly detection<br/>Entity embedding"]:::ml
+        ML2["Auto-Discard Model<br/>Low-risk suppression<br/>Threshold: configurable"]:::ml
+        ML3["Entity Resolution<br/>Fuzzy name matching<br/>UBO graph inference"]:::ml
+        ML4["STR Narrative Gen<br/>GenAI draft creation<br/>HKMA GenAI Sandbox"]:::ml
+        ML5["Champion-Challenger<br/>A/B model comparison<br/>Held-out test set"]:::ml
+    end
+
+    subgraph TUNING["PERIODIC TUNING CYCLE"]
+        direction TB
+        T1["Daily KPI Monitoring<br/>Alert volume<br/>FP rate<br/>SLA adherence"]:::tuning
+        T2["Monthly Scenario Review<br/>Per-rule FP rate<br/>True positive rate<br/>STR conversion rate"]:::tuning
+        T3["Annual TM Tuning Report<br/>Statistical calibration<br/>Above/below-the-line test<br/>Sensitivity analysis"]:::tuning
+        T4["Trigger Event Review<br/>Alert surge<br/>New typology<br/>Product change<br/>Regulatory update"]:::tuning
+        T5["Threshold Adjustment<br/>Increase / Decrease<br/>Segment split<br/>New scenario"]:::tuning
+    end
+
+    subgraph GOVERNANCE["MODEL GOVERNANCE & OVERSIGHT"]
+        direction TB
+        G1["Model Validation<br/>Independent review<br/>Data lineage test<br/>Reconciliation check"]:::governance
+        G2["AML Committee Approval<br/>Proposed changes reviewed<br/>Quarterly KPI report"]:::governance
+        G3["Explainability Audit<br/>Model logic documented<br/>Decision rationale traceable"]:::governance
+        G4["Regulatory Submission<br/>HKMA AI feasibility report<br/>Model change log"]:::governance
+        G5["Independent Audit<br/>Direct line to senior mgt<br/>Annual AML/CFT review"]:::governance
+    end
+
+    D1 --> H1
+    D1 --> H2
+    D1 --> H3
+    D1 --> H4
+    D1 --> H5
+    
+    D2 --> H1
+    D2 --> H2
+    D2 --> H3
+    D2 --> H4
+    D2 --> H5
+    
+    D3 --> H1
+    D3 --> H2
+    D3 --> H3
+    D3 --> H4
+    D3 --> H5
+    
+    D4 --> H1
+    D4 --> H2
+    D4 --> H3
+    D4 --> H4
+    D4 --> H5
+
+    H1 --> ML1
+    H1 --> ML2
+    H1 --> ML3
+    
+    H2 --> ML1
+    H2 --> ML2
+    H2 --> ML3
+    
+    H3 --> ML1
+    H3 --> ML2
+    H3 --> ML3
+    
+    H4 --> ML1
+    H4 --> ML2
+    H4 --> ML3
+    
+    H5 --> ML1
+    H5 --> ML2
+    H5 --> ML3
+
+    H3 --> ML4
+    
+    ML1 --> ML5
+    ML2 --> ML5
+    
+    ML5 -->|Champion wins| ML1
+    ML5 -->|Challenger wins| ML2
+    
+    H1 --> T1
+    H2 --> T1
+    
+    T1 --> T2
+    T2 --> T3
+    
+    T4 -. "ad-hoc trigger" .-> T3
+    
+    T3 --> T5
+    
+    T5 --> ML1
+    T5 --> ML2
+    
+    T5 --> G1
+    
+    G1 --> G2
+    G2 --> G3
+    G3 --> G4
+    G4 --> G5
+    
+    G5 -->|Findings| T4
+    
+    ML4 -->|Draft STR narrative| H3
+    G2 -->|Approved changes| D1
+</div>
+</div>
+
+<div id="tab-kpi_dashboard" class="tab-content">
+  <h2>HKMA KPI Framework & Reporting Cycle</h2>
+  <div class="mermaid">flowchart LR
+    classDef kpi fill:#0d2a1e,stroke:#16a34a,color:#e6edf3,font-size:12px
+    classDef calc fill:#0d1a30,stroke:#3b82f6,color:#e6edf3,font-size:12px
+    classDef report fill:#2d1515,stroke:#ef4444,color:#e6edf3,font-size:12px
+    classDef action fill:#1e1030,stroke:#a855f7,color:#e6edf3,font-size:12px
+
+    subgraph INPUTS["DATA INPUTS (Daily T+1)"]
+        I1["Total Active Customers"]:::calc
+        I2["Alerts Generated<br/>Real-time + Batch"]:::calc
+        I3["Alerts Reviewed<br/>FP / TP / Inconclusive"]:::calc
+        I4["Cases Opened / Closed"]:::calc
+        I5["STRs Filed"]:::calc
+        I6["Travel Rule Records<br/>Compliant / Non-compliant"]:::calc
+        I7["SLA Breaches"]:::calc
+        I8["Auto-Discard QA Pass Rate"]:::calc
+    end
+
+    subgraph KPIs["HKMA-MANDATED KPIs"]
+        K1["Alert Rate<br/>= Alerts / Active Customers × 1,000<br/>Target: benchmark vs peer group"]:::kpi
+        K2["False Positive Rate<br/>= FP Alerts / Total Reviewed<br/>Target: continuous reduction"]:::kpi
+        K3["STR Conversion Rate<br/>= STRs Filed / Productive Cases<br/>Target: quality improvement"]:::kpi
+        K4["Alert-to-STR Rate<br/>= STRs / Total Alerts<br/>Target: productivity signal"]:::kpi
+        K5["SLA Compliance Rate<br/>= On-time reviews / Total reviews<br/>Target: &gt; 95%"]:::kpi
+        K6["Productive Case Rate<br/>= TP Alerts / Total Alerts<br/>Target: threshold calibration"]:::kpi
+        K7["Travel Rule Compliance<br/>= Compliant txns / Total VA txns<br/>Target: 100% (Cap.656)"]:::kpi
+        K8["ML Model Accuracy<br/>= Auto-discard QA pass rate<br/>Target: &gt; 95% precision"]:::kpi
+    end
+
+    subgraph REPORTING["REPORTING CYCLE"]
+        R1["Daily Dashboard<br/>Ops team + Tech<br/>SLA breach alerts"]:::report
+        R2["Monthly KPI Pack<br/>Compliance team<br/>FP rate trends"]:::report
+        R3["Quarterly Report<br/>AML Committee<br/>All HKMA KPIs"]:::report
+        R4["Annual Tuning Report<br/>Scenario performance<br/>Threshold proposals"]:::report
+        R5["HKMA Submission<br/>Supervisory return<br/>AI implementation plan"]:::report
+    end
+
+    subgraph ACTIONS["IMPROVEMENT ACTIONS"]
+        A1["Threshold Increase<br/>if FP rate too high"]:::action
+        A2["Threshold Decrease<br/>if TP rate too low"]:::action
+        A3["Retire Scenario<br/>if zero STR conversion"]:::action
+        A4["Add Segment<br/>if customer type skew"]:::action
+        A5["ML Retraining<br/>if drift detected"]:::action
+        A6["Resource Increase<br/>if SLA breach trend"]:::action
+    end
+
+    I1 --> K1
+    I2 --> K1
+    
+    I3 --> K2
+    I3 --> K6
+    
+    I4 --> K3
+    I4 --> K4
+    
+    I5 --> K3
+    I5 --> K4
+    
+    I7 --> K5
+    I6 --> K7
+    I8 --> K8
+
+    K1 --> R1
+    K2 --> R1
+    K3 --> R1
+    K4 --> R1
+    K5 --> R1
+    K6 --> R1
+    K7 --> R1
+    K8 --> R1
+
+    R1 --> R2
+    R2 --> R3
+    R3 --> R4
+    R4 --> R5
+
+    K2 -->|FP rate high| A1
+    K6 -->|TP rate low| A2
+    K3 -->|Zero conversion| A3
+    K4 -->|Segment gap| A4
+    K8 -->|Model drift| A5
+    K5 -->|SLA breach| A6
+</div>
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  securityLevel: 'loose',
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#1e3a5f',
+    primaryTextColor: '#e6edf3',
+    primaryBorderColor: '#388bfd',
+    lineColor: '#8b949e',
+    secondaryColor: '#161b22',
+    tertiaryColor: '#0d1117',
+    edgeLabelBackground: '#0d1117',
+    fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+    fontSize: '13px'
+  },
+  flowchart: { diagramPadding: 30, htmlLabels: true },
+  sequence: { diagramMarginX: 50, diagramMarginY: 30 }
+});
+
+function showTab(key) {
+  // Utilizing CSS positioning class shifting (`.active`) instead of `display: none`
+  // Prevents the SVG bounding box measuring dimensions of 0x0
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + key).classList.add('active');
+  document.getElementById('btn-' + key).classList.add('active');
+}
+</script>
+</body>
+</html>

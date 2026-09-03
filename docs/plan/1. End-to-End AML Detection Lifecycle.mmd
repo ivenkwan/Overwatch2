@@ -1,0 +1,104 @@
+flowchart TD
+classDef system fill:#1e3a5f,stroke:#388bfd,color:#e6edf3
+classDef process fill:#0d3320,stroke:#2ea043,color:#e6edf3
+classDef decision fill:#3d2700,stroke:#e3a008,color:#e6edf3
+classDef alertnode fill:#3d1a00,stroke:#e05c1a,color:#e6edf3
+classDef regulatory fill:#3d0014,stroke:#f85149,color:#e6edf3
+classDef closed fill:#1a1a1a,stroke:#555555,color:#aaaaaa
+
+subgraph INGEST["1. TRANSACTION INGESTION"]
+    direction LR
+    T1["Fiat Transaction<br/>SWIFT / FPS / CHATS / RTGS"]:::system
+    T2["Stablecoin / VA Transaction<br/>On-chain transfer / Mint / Redeem"]:::system
+    T3["Transaction Enrichment<br/>HKD normalisation / FX / Country code"]:::process
+end
+
+subgraph SCREEN["2. REAL-TIME SCREENING"]
+    direction LR
+    S1["Sanctions Screening<br/>OFAC / UNSC / EU / HKMA Designated"]:::alertnode
+    S2["PEP Screening<br/>Domestic / Foreign / IO / Family"]:::alertnode
+    S3["Blockchain Analytics<br/>Risk score 0-100"]:::alertnode
+    S4["Travel Rule Check<br/>Zero-threshold stablecoin<br/>HKD 8000 data requirement"]:::alertnode
+end
+
+subgraph DET["3. DETECTION ENGINE"]
+    direction LR
+    D1["Real-Time Rules<br/>Sanctions match / High-value<br/>Travel Rule breach / Rapid layering"]:::system
+    D2["T+1 Batch Rules<br/>Structuring 30-day window<br/>Velocity vs baseline / Dormant"]:::system
+    D3["ML Risk Scoring<br/>Behavioural analytics<br/>Alert prioritisation 0-100"]:::system
+end
+
+subgraph ALERT_MGMT["4. ALERT TRIAGE - L1 REVIEW"]
+    A1["Alert Generated<br/>Rule code / Risk score / SLA timer"]:::alertnode
+    A2{"Auto-Discard?<br/>ML score below threshold"}:::decision
+    A3["L1 Analyst Review<br/>KYC profile check<br/>Expected behaviour / FP test"]:::process
+    A4{"Clear as<br/>False Positive?"}:::decision
+    A5["Sample QA Check<br/>10 pct of auto-discards<br/>validated by L2"]:::process
+    A6["Escalate to L2<br/>Case intake / Alert package"]:::process
+end
+
+subgraph INVEST["5. L2 INVESTIGATION"]
+    I1["Transaction Pattern Analysis<br/>Structuring / Layering / Velocity"]:::process
+    I2["Customer Profile Review<br/>KYC / EDD / Source of wealth"]:::process
+    I3["Network Analysis<br/>UBO chain / Counterparties / Graph"]:::process
+    I4["OSINT and External Checks<br/>Adverse news / Court orders / LEA"]:::process
+    I5["EDD / RFI<br/>Request for Information"]:::process
+    I6{"Satisfactory<br/>Explanation?"}:::decision
+    I7["Document Findings<br/>Case narrative / Evidence pack"]:::process
+    I8["Recommend STR Filing<br/>Escalate to MLRO"]:::alertnode
+    I9["Close Case - No Suspicion<br/>Document rationale"]:::closed
+end
+
+subgraph MLRO_LAYER["6. MLRO DECISION - L3"]
+    M1["MLRO Review<br/>Validate L2 findings<br/>Apply SAFE test"]:::regulatory
+    M2{"Reasonable Grounds<br/>for Suspicion?"}:::decision
+    M3["No STR - Monitor<br/>Update risk rating<br/>Enhanced monitoring"]:::process
+    M4["Approve STR Filing<br/>Sign-off / Tipping-off check"]:::regulatory
+end
+
+subgraph STR_FILING["7. STR FILING - JFIU STREAMS 2"]
+    direction LR
+    F1["Draft STR<br/>Subject details / Narrative<br/>Transaction refs"]:::regulatory
+    F2["Internal Approval<br/>Compliance Officer sign-off"]:::regulatory
+    F3["Submit via STREAMS 2<br/>XML / PDF / Web form<br/>HK Post e-cert required"]:::regulatory
+    F4["JFIU Acknowledgement<br/>Reference number assigned"]:::regulatory
+    F5["Post-STR Controls<br/>Enhanced monitoring<br/>No tipping-off / Consider exit"]:::regulatory
+end
+
+subgraph POSTACT["8. POST-ACTION AND RECORD KEEPING"]
+    direction LR
+    R1["Update Customer Risk Rating<br/>CDD / EDD refresh"]:::process
+    R2["Record Retention<br/>6 plus years - AMLO requirement"]:::process
+    R3["Regulatory Reporting<br/>HKMA supervisory returns<br/>Quarterly KPI to AML Committee"]:::process
+    R4["Feedback Loop<br/>Alert outcome to ML model<br/>Scenario tuning signal"]:::process
+end
+
+T1 --> T3
+T2 --> T3
+T3 --> S1 & S2 & S3 & S4
+S1 & S2 & S3 & S4 --> D1 & D2
+D1 & D2 --> D3
+D3 --> A1
+A1 --> A2
+A2 -->|Yes auto-discard| A5
+A2 -->|No queue for L1| A3
+A5 -->|Pass| R4
+A5 -->|QA fail| A3
+A3 --> A4
+A4 -->|Yes close FP| R4
+A4 -->|No escalate| A6
+A6 --> I1 & I2 & I3 & I4
+I5 -.->|if needed| I2
+I1 & I2 & I3 & I4 --> I6
+I6 -->|Yes| I9
+I6 -->|No| I7
+I7 --> I8
+I8 --> M1
+M1 --> M2
+M2 -->|No| M3
+M3 --> R1
+M2 -->|Yes| M4
+M4 --> F1 --> F2 --> F3 --> F4 --> F5
+F5 --> R1
+I9 --> R1
+R1 --> R2 & R3 & R4

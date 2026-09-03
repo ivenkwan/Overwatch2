@@ -1,0 +1,51 @@
+# HKMA AML KPI Datamart & Governance MIS Dashboard
+
+The AML Governance MIS Dashboard implementation is now complete and operational according to the approved plan. This module processes operational data into a daily KPI datamart and presents the resulting T+1 metrics in a high-fidelity visual dashboard aligned with HKMA requirements.
+
+## 🛠️ Data Infrastructure & ETL Deployment
+
+- **Database Changes (Datamart)**: 
+  A new isolated schema `mart` has been initialized in the PostgreSQL/AGE environment to physically decouple the analytical data model from the transactional systems. The `mart.daily_aml_kpi` table was created to store aggregate fields such as active relationships, reviewed alerts, missing SLAs, and generated ratios.
+
+- **ETL Script (`daily_kpi_mart.py`)**: 
+  We authored a daily aggregation ETL script that connects to the database via `asyncpg`. 
+  - To prevent computational failures on low-volume staging days, we employed zero-safe mathematical divisions `max(x, 1)`.
+  - To handle data recalculations safely, we implemented the `ON CONFLICT (report_date) DO UPDATE` pattern for robust idempotency.
+  - Per the execution requirements, SLA calculations strictly mandate a 72-hour window. Active Relationship denominators utilize the fallback model (50,000 threshold).
+  
+```python
+# Zero-Safe KPI Extraction
+alert_rate = (total_alerts / max(active_relationships, 1)) * 1000
+productive_alert_rate = (cases_opened / max(reviewed_alerts, 1)) * 100 
+false_positive_rate = (closed_non_suspicious / max(reviewed_alerts, 1)) * 100
+```
+
+## 🔌 API Connectivity
+
+The FastAPI backend now serves the daily datamart through the new GET `/api/v1/reports/kpis` endpoint, restricting scope cleanly using the established `DEPARTMENT_HEAD` security middleware.
+
+## 📺 Frontend Governance Dashboard
+
+- We successfully constructed `frontend/src/app/(dashboard)/governance/page.tsx` leveraging Next.js App Router and Tailwind CSS for dynamic styling. 
+- Integrated directly with the frontend API service module to load `T+1` datamart records.
+- **RAG Status Configuration Engine**: 
+  Threshold variables (Red/Amber/Green) mapped explicitly from the requested `KPI_Matrix.csv` drive the UI's semantic colors to alert management of compliance anomalies promptly.
+
+```typescript
+// Threshold Application Engine
+const getRagStatus = (value, thresholdType, boundaries) => {
+  if (thresholdType === 'low_better') {
+    if (value >= boundaries[1]) return { color: 'text-red-600', bg: 'bg-red-50' };
+    if (value > boundaries[0]) return { color: 'text-amber-600', bg: 'bg-amber-50' };
+    return { color: 'text-emerald-600', bg: 'bg-emerald-50' };
+  }
+  // Reverse logic applied for high_better targets
+}
+```
+
+## ✅ Verification
+The Next.js build compilation passed successfully. The `/governance` application route is fully active and accessible directly from the Global Navigation Sidebar (BarChart icon). The ETL has been successfully run against the operational tables (`app.alerts`) and correctly stored metrics for `2026-04-06` (T-1).
+
+### Next Actions:
+- Integrate `daily_kpi_mart.py` into a robust scheduler (e.g., cron or Dagster pipeline) for automated nightly synchronization.
+- Expand `active_relationships` query parameters significantly if `core.customers` schema is further populated with dimension-time histories.

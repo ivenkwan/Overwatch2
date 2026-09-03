@@ -1,0 +1,3 @@
+20260407_CUST_TNG.csv
+20260407_CUST_TNG.csv
+based on file structure of input_data\20260407_CUST_TNG.csv.OK, generate a a new data synthetic data file with filename 20260408_CUST_TNG.csv with pattern showing circular trasaction detection, smurifing detection and rapid movement detection. use python script to generate the sample csv and save the script to./tmp

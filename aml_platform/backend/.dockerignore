@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+.env
+.pytest_cache/
+.tox/
+.git/
+.gitignore
+Dockerfile
+docker-compose.yml

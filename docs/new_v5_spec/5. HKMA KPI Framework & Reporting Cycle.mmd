@@ -1,0 +1,61 @@
+flowchart LR
+classDef kpi fill:#0d2a1e,stroke:#16a34a,color:#e6edf3
+classDef calc fill:#0d1a30,stroke:#3b82f6,color:#e6edf3
+classDef report fill:#2d1515,stroke:#ef4444,color:#e6edf3
+classDef action fill:#1e1030,stroke:#a855f7,color:#e6edf3
+
+subgraph INPUTS["DATA INPUTS - Daily T plus 1"]
+    I1["Total Active Customers"]:::calc
+    I2["Alerts Generated<br/>Real-time and Batch"]:::calc
+    I3["Alerts Reviewed<br/>FP TP Inconclusive"]:::calc
+    I4["Cases Opened Closed"]:::calc
+    I5["STRs Filed"]:::calc
+    I6["Travel Rule Records<br/>Compliant Non-compliant"]:::calc
+    I7["SLA Breaches"]:::calc
+    I8["Auto-Discard QA Pass Rate"]:::calc
+end
+
+subgraph KPIs["HKMA MANDATED KPIs"]
+    K1["Alert Rate<br/>Alerts / Active Customers x 1000<br/>Target peer group benchmark"]:::kpi
+    K2["False Positive Rate<br/>FP Alerts / Total Reviewed<br/>Target continuous reduction"]:::kpi
+    K3["STR Conversion Rate<br/>STRs / Productive Cases<br/>Target quality improvement"]:::kpi
+    K4["Alert to STR Rate<br/>STRs / Total Alerts<br/>Target productivity signal"]:::kpi
+    K5["SLA Compliance Rate<br/>On-time / Total reviews<br/>Target above 95 pct"]:::kpi
+    K6["Productive Case Rate<br/>TP Alerts / Total Alerts<br/>Target threshold calibration"]:::kpi
+    K7["Travel Rule Compliance<br/>Compliant / Total VA txns<br/>Target 100 pct Cap.656"]:::kpi
+    K8["ML Model Accuracy<br/>Auto-discard QA pass rate<br/>Target above 95 pct precision"]:::kpi
+end
+
+subgraph REPORTING["REPORTING CYCLE"]
+    R1["Daily Dashboard<br/>Ops team and Tech<br/>SLA breach alerts"]:::report
+    R2["Monthly KPI Pack<br/>Compliance team<br/>FP rate trends"]:::report
+    R3["Quarterly Report<br/>AML Committee<br/>All HKMA KPIs"]:::report
+    R4["Annual Tuning Report<br/>Scenario performance<br/>Threshold proposals"]:::report
+    R5["HKMA Submission<br/>Supervisory return<br/>AI implementation plan"]:::report
+end
+
+subgraph ACTIONS["IMPROVEMENT ACTIONS"]
+    A1["Threshold Increase<br/>if FP rate too high"]:::action
+    A2["Threshold Decrease<br/>if TP rate too low"]:::action
+    A3["Retire Scenario<br/>if zero STR conversion"]:::action
+    A4["Add Segment<br/>if customer type skew"]:::action
+    A5["ML Retraining<br/>if drift detected"]:::action
+    A6["Resource Increase<br/>if SLA breach trend"]:::action
+end
+
+I1 & I2 --> K1
+I3 --> K2 & K6
+I4 & I5 --> K3 & K4
+I7 --> K5
+I6 --> K7
+I8 --> K8
+
+K1 & K2 & K3 & K4 & K5 & K6 & K7 & K8 --> R1
+R1 --> R2 --> R3 --> R4 --> R5
+
+K2 -->|FP rate high| A1
+K6 -->|TP rate low| A2
+K3 -->|Zero conversion| A3
+K4 -->|Segment gap| A4
+K8 -->|Model drift| A5
+K5 -->|SLA breach| A6

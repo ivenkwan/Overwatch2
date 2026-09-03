@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # 1. Database: AGE Data storage
+  age_db:
+    image: apache/age
+    container_name: aml-age-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: age_prod_01
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - aml_pgdata:/var/lib/postgresql/data
+      - ../etl/sql/init_schema.sql:/docker-entrypoint-initdb.d/00_init_schema.sql
+      - ./backend/init_scripts/01_rbac_initialization.sql:/docker-entrypoint-initdb.d/01_rbac_initialization.sql
+      - ./backend/init_scripts/02_audit_tamper_evidence.sql:/docker-entrypoint-initdb.d/02_audit_tamper_evidence.sql
+      - ./backend/init_scripts/03_keycloak_initialization.sql:/docker-entrypoint-initdb.d/03_keycloak_initialization.sql
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres", "-d", "age_prod_01" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aml-network
+
+  # 2. Dagster ETL
+  dagster_etl:
+    build:
+      context: ../etl
+    container_name: aml-dagster-etl
+    restart: always
+    env_file:
+      - ../etl/.env
+    environment:
+      DAGSTER_HOME: /opt/dagster/app
+      POSTGRES_URI: postgresql://postgres:password@age_db:5432/age_prod_01
+    ports:
+      - "3001:3000"
+    volumes:
+      - ../etl:/opt/dagster/app
+      - ../input_data:/opt/dagster/input_data
+    depends_on:
+      age_db:
+        condition: service_healthy
+    command: dagster dev -h 0.0.0.0 -p 3000
+    networks:
+      - aml-network
+
+  # 3. Backend: Modular FastAPI App
+  aml-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aml-fastapi-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://aml_api_role:aml_secure_api_password@age_db:5432/age_prod_01
+      ENV: production
+    ports:
+      - "8000:8000"
+    depends_on:
+      age_db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aml-network
+
+  # 4. Keycloak: Identity Management
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    command: start-dev
+    container_name: aml-keycloak
+    environment:
+      # These bootstrap credentials will create the master realm admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://age_db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+    ports:
+      - "8080:8080"
+    depends_on:
+      age_db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aml-network
+
+  # 5. Frontend: Next.js App
+  aml-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aml-nextjs-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - aml-backend
+    restart: unless-stopped
+    networks:
+      - aml-network
+
+  # 6. Flowable Workflow Engine
+  flowable:
+    image: flowable/flowable-rest:latest
+    container_name: aml-flowable
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://age_db:5432/age_prod_01?currentSchema=public
+      - SPRING_DATASOURCE_USERNAME=aml_api_role
+      - SPRING_DATASOURCE_PASSWORD=aml_secure_api_password
+      - SPRING_DATASOURCE_DRIVER-CLASS-NAME=org.postgresql.Driver
+    ports:
+      - "8081:8080" # Using 8081 to avoid conflict with keycloak on 8080
+    depends_on:
+      age_db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aml-network
+
+volumes:
+  aml_pgdata:
+
+networks:
+  aml-network:
+    driver: bridge

@@ -1,0 +1,7 @@
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - LOGS_CAPTURED - Started capturing logs in process (pid: 72270).
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - raw_ledger_data - STEP_START - Started execution of step "raw_ledger_data".
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - raw_ledger_data - STEP_OUTPUT - Yielded output "result" of type "DataFrame". (Type check passed).
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - raw_ledger_data - Writing file at: /opt/dagster/app/storage/raw_ledger_data using PickledObjectFilesystemIOManager...
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - raw_ledger_data - ASSET_MATERIALIZATION - Materialized value raw_ledger_data.
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - raw_ledger_data - HANDLED_OUTPUT - Handled output "result" using IO manager "io_manager"
+2026-04-06 13:28:42 +0000 - dagster - DEBUG - __ASSET_JOB - cf843dd0-97f3-4cb8-8e76-7227eb1d19eb - 72270 - raw_ledger_data - STEP_SUCCESS - Finished execution of step "raw_ledger_data" in 565ms.

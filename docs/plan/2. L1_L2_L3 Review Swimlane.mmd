@@ -1,0 +1,60 @@
+sequenceDiagram
+autonumber
+participant TMS as TM System
+participant L1 as L1 Analyst
+participant L2 as L2 Investigator
+participant MLRO as MLRO L3
+participant JFIU as JFIU STREAMS 2
+participant AUDIT as Audit Log
+
+TMS->>L1: Alert generated with rule code, risk score, SLA
+Note over TMS,L1: Real-time immediate or Batch T+1 next business day
+
+L1->>L1: Check KYC profile vs transaction
+L1->>L1: Review prior alerts and risk history
+
+alt False Positive
+    L1->>TMS: Close alert with documented rationale
+    L1->>AUDIT: Log FP decision and evidence
+else Genuine Concern
+    L1->>L2: Escalate with alert package and initial notes
+    L1->>AUDIT: Log escalation reason
+end
+
+L2->>L2: Transaction pattern analysis
+L2->>L2: OSINT and adverse media and PEP check
+L2->>L2: Network graph - UBO and counterparties
+L2->>L2: Blockchain analytics if VA or stablecoin
+
+opt RFI Required
+    L2->>L2: Customer RFI - internal only
+    Note over L2: Must NOT reveal STR investigation - Cap.405 s.25A tipping-off prohibition
+end
+
+alt Explanation Satisfactory
+    L2->>TMS: Close case - no grounds for suspicion
+    L2->>AUDIT: Log closure rationale and evidence
+else Suspicion Remains
+    L2->>MLRO: Escalate with full investigation pack
+    L2->>AUDIT: Log STR recommendation and basis
+end
+
+MLRO->>MLRO: Apply SAFE test - Screen Ask Find Evaluate
+MLRO->>MLRO: Review L2 findings and evidence
+MLRO->>MLRO: Validate tipping-off controls
+
+alt No Reasonable Grounds
+    MLRO->>TMS: Close with enhanced monitoring flag
+    MLRO->>AUDIT: Log MLRO decision and rationale
+else Reasonable Grounds for Suspicion
+    MLRO->>MLRO: Approve STR filing
+    MLRO->>JFIU: Submit STR via STREAMS 2
+    JFIU-->>MLRO: Acknowledgement and JFIU reference number
+    MLRO->>TMS: Flag account for post-STR monitoring
+    MLRO->>AUDIT: Log STR ref, submission timestamp, approver
+    Note over MLRO,JFIU: No Tipping Off - customer must NOT be informed
+end
+
+MLRO->>L2: Feedback on STR outcome and learning points
+L2->>L1: Feedback on scenario tuning signals
+L1->>TMS: Request threshold or rule adjustment if pattern found

@@ -1,0 +1,3 @@
+# Empty dagster.yaml to satisfy requirement
+telemetry:
+  enabled: false

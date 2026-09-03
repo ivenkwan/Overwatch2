@@ -1,0 +1,20 @@
+INFO:aml-demo-automation:\U0001f680 Starting Full AML Demo Automation Pipeline...
+INFO:aml-demo-automation:--- Ensuring Schema Exists (init-scripts) ---
+WARNING:aml-demo-automation:Staging tables not found. Initializing from scripts...
+INFO:aml-demo-automation:Executing: ../init-scripts/01-init.sql
+ERROR:aml-demo-automation:Failed statement in ../init-scripts/01-init.sql: -- Initialize the Core Graph Namespace (ag_catalog... Error: graph "aml_network" already exists
+
+ERROR:aml-demo-automation:Error ensuring schema: graph "aml_network" already exists
+
+Traceback (most recent call last):
+  File "Z:\GITHUB\Overwatch\aml_platform\etl\run_demo_demo.py", line 109, in <module>
+    main()
+    ~~~~^^
+  File "Z:\GITHUB\Overwatch\aml_platform\etl\run_demo_demo.py", line 92, in main
+    ensure_schema_exists()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "Z:\GITHUB\Overwatch\aml_platform\etl\run_demo_demo.py", line 72, in ensure_schema_exists
+    cur.execute(stmt + ";")
+    ~~~~~~~~~~~^^^^^^^^^^^^
+psycopg2.errors.InvalidSchemaName: graph "aml_network" already exists
+

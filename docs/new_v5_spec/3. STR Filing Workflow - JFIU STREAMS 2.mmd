@@ -1,0 +1,65 @@
+flowchart TD
+classDef trigger fill:#1e3a5f,stroke:#388bfd,color:#e6edf3
+classDef prep fill:#0d3320,stroke:#2ea043,color:#e6edf3
+classDef approval fill:#3d2700,stroke:#e3a008,color:#e6edf3
+classDef submission fill:#3d0014,stroke:#f85149,color:#e6edf3
+classDef postfiling fill:#1a1a2e,stroke:#7c3aed,color:#e6edf3
+classDef legal fill:#2d1515,stroke:#db2777,color:#e6edf3
+
+START(["MLRO approves STR filing<br/>Reasonable grounds confirmed"]):::trigger
+
+subgraph PREP["STR PREPARATION"]
+    P1["Compile subject details<br/>Name HKID Passport DOB<br/>Address Occupation Salary<br/>Source of wealth"]:::prep
+    P2["Document suspicious activity<br/>Narrative what happened<br/>When How much Pattern"]:::prep
+    P3["State reasons for suspicion<br/>SAFE approach indicators<br/>Red flags Rule reference"]:::prep
+    P4["Attach transaction references<br/>All flagged txn IDs<br/>Time period HKD amounts"]:::prep
+    P5["Specify applicable ordinances<br/>Cap.405 DTROP<br/>Cap.455 OSCO<br/>Cap.575 UNATMO"]:::legal
+    P6["Tipping-off risk review<br/>Customer contact freeze<br/>Internal need-to-know only"]:::legal
+end
+
+subgraph APPROVAL["INTERNAL APPROVAL"]
+    A1["Compliance Officer review<br/>Validate completeness<br/>Check narrative quality"]:::approval
+    A2{"Approved?"}:::approval
+    A3["Return to L2 MLRO<br/>Additional evidence needed"]:::approval
+    A4["Board notification<br/>if critical or large amount<br/>or systemic risk"]:::approval
+end
+
+subgraph SUBMIT["SUBMISSION - JFIU STREAMS 2"]
+    S1{"Submission method"}:::submission
+    S2["XML Submission<br/>System-to-system<br/>HK Post e-cert required"]:::submission
+    S3["PDF Upload<br/>Structured PDF form<br/>HK Post e-cert required"]:::submission
+    S4["Web Form<br/>Direct STREAMS 2 input<br/>No e-cert needed"]:::submission
+    S5["JFIU Receipt<br/>Acknowledgement email<br/>JFIU reference number"]:::submission
+end
+
+subgraph POST["POST-FILING OBLIGATIONS"]
+    Q1["Update case record<br/>STR reference logged<br/>Timestamp recorded"]:::postfiling
+    Q2["Enhanced account monitoring<br/>Alert thresholds lowered<br/>Transaction holds if needed"]:::postfiling
+    Q3["No tipping-off maintained<br/>Customer NOT informed<br/>Internal comms restricted"]:::legal
+    Q4{"JFIU follow-up<br/>request?"}:::postfiling
+    Q5["Respond to JFIU<br/>Provide additional info<br/>Law enforcement liaison"]:::postfiling
+    Q6["Consider exit relationship<br/>Based on risk assessment<br/>Document rationale"]:::postfiling
+    Q7["Supplemental STR<br/>if new evidence emerges"]:::submission
+    Q8["Record retention<br/>6 plus years from transaction date<br/>AMLO Cap.615 requirement"]:::legal
+end
+
+START --> P1 & P2 & P3 & P4 & P5
+P5 --> P6
+P1 & P2 & P3 & P4 & P6 --> A1
+A1 --> A2
+A2 -->|No| A3
+A3 --> P1
+A2 -->|Yes| A4
+A4 --> S1
+S1 -->|High volume automated| S2
+S1 -->|Standard| S3
+S1 -->|Ad-hoc| S4
+S2 & S3 & S4 --> S5
+S5 --> Q1
+Q1 --> Q2 & Q3
+Q2 --> Q4
+Q4 -->|Yes| Q5
+Q5 --> Q7
+Q4 -->|No| Q6
+Q6 --> Q8
+Q7 --> Q8

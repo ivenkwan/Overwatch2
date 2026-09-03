@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+psycopg2-binary
+pydantic
+pytest>=7.0.0
+asyncpg>=0.29.0
+requests
+python-dotenv
+PyJWT
+passlib[bcrypt]
+python-multipart
+email-validator
+python-keycloak
+httpx

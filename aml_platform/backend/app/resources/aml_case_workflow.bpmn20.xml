@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://www.flowable.org/processdef">
+
+    <process id="aml_case_workflow" name="AML Maker Checker Workflow" isExecutable="true">
+        
+        <startEvent id="startEvent" name="Start Case" />
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="makerTask" />
+
+        <userTask id="makerTask" name="L2 Investigator Draft (Maker)" flowable:candidateGroups="AML_INVESTIGATOR" />
+        <sequenceFlow id="flow2" sourceRef="makerTask" targetRef="checkerTask" />
+
+        <userTask id="checkerTask" name="Approval Review (Checker)" flowable:candidateGroups="AML_APPROVER" />
+        <sequenceFlow id="flow3" sourceRef="checkerTask" targetRef="approvalGateway" />
+
+        <exclusiveGateway id="approvalGateway" name="Approval Gateway" />
+        <sequenceFlow id="flowApproved" sourceRef="approvalGateway" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved}]]></conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flowRejected" sourceRef="approvalGateway" targetRef="makerTask">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${!approved}]]></conditionExpression>
+        </sequenceFlow>
+
+        <endEvent id="endApproved" name="Case Approved" />
+
+    </process>
+</definitions>

@@ -1,0 +1,534 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0',
+  'primaryBorderColor': '#4a90d9', 'lineColor': '#6db3f2',
+  'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460',
+  'mainBkg': '#1a1a2e', 'clusterBkg': '#0f3460',
+  'titleColor': '#6db3f2', 'edgeLabelBackground': '#16213e',
+  'fontFamily': 'Segoe UI, sans-serif'
+}}}%%
+flowchart TD
+
+%% ══════════════════════════════════════════════════════════════
+%% AML DATA MODEL — FIAT & STABLECOIN (HK Regulatory Compliant)
+%% AMLO Cap.615 · Stablecoins Ord Cap.656 · HKMA AML/CFT Guideline
+%% T+1 Batch + Real-Time | Network Graph | KPI Daily Summary
+%% ══════════════════════════════════════════════════════════════
+
+subgraph CORE["🏛️  aml_core — KYC · Accounts · Transactions"]
+  direction TB
+
+  subgraph KYC["KYC Domain"]
+    PARTY["<b>party</b>
+─────────────────────
+party_id PK
+party_type INDIVIDUAL|CORPORATE|FI|TRUST
+full_name
+hkid_passport_no
+nationality_code · country_of_residence
+customer_risk_rating LOW|MED|HIGH|PEP|SANCTIONED
+is_pep · is_sanctioned · sanctions_list_ref
+is_beneficial_owner_identified
+onboarding_channel FACE_TO_FACE|REMOTE|iAM_SMART
+cdd_last_reviewed_at · edd_required_at
+is_active · created_at"]
+
+    PARTY_DOC["<b>party_document</b>
+─────────────────────
+doc_id PK · party_id FK
+doc_type HKID|PASSPORT|BR|CI|POA
+doc_number · expiry_date
+issuing_country · is_verified · verified_at"]
+
+    PARTY_REL["<b>party_relationship</b>
+─────────────────────
+rel_id PK
+party_id_from FK · party_id_to FK
+relationship_type DIRECTOR|SHAREHOLDER
+BENEFICIAL_OWNER|GUARANTOR|TRUSTEE
+ownership_percentage
+effective_from · effective_to"]
+
+    WATCHLIST["<b>watchlist_entry</b>
+─────────────────────
+watchlist_id PK
+list_type OFAC_SDN|UNSC|EU|HMT
+HKMA_SANCTIONED|PEP_GLOBAL|PEP_HK
+listed_name · alias_names
+entity_type · listing_date · is_active
+last_synced_at"]
+  end
+
+  subgraph ACCTS["Account Domain"]
+    ACCOUNT["<b>account</b>
+─────────────────────
+account_id PK
+account_type CURRENT|SAVINGS|SVF
+STABLECOIN_WALLET|CRYPTO_WALLET
+account_rail FIAT|STABLECOIN
+currency_code HKD|USD|USDT|USDC|HKDG
+institution_code BIC|LEI
+account_status ACTIVE|DORMANT|FROZEN|CLOSED
+account_risk_rating · current_balance
+blockchain_address
+blockchain_network ETH|TRON|BNB|POLYGON
+wallet_custody_type HOSTED|UNHOSTED|EXCHANGE"]
+
+    ACCT_PARTY["<b>account_party_link</b>
+─────────────────────
+link_id PK
+account_id FK · party_id FK
+role OWNER|JOINT_HOLDER
+AUTHORISED_SIGNATORY|BENEFICIARY
+effective_from · effective_to"]
+  end
+
+  subgraph TXNS["Transaction Domain"]
+    TXN["<b>transaction</b>  ← PARTITIONED by initiated_at
+─────────────────────
+txn_id PK · txn_reference
+txn_rail FIAT|STABLECOIN
+txn_channel SWIFT|CHATS|FPS|JETCO|ACH|BLOCKCHAIN|SVF
+txn_type CREDIT|DEBIT|TRANSFER|MINT|REDEEM|SWAP|BURN
+originator_account_id FK · beneficiary_account_id FK
+originator_party_id FK · beneficiary_party_id FK
+txn_amount · txn_currency
+hkd_equivalent_amount  ← normalised for thresholds
+txn_status PENDING|COMPLETED|FAILED|HELD|BLOCKED
+initiated_at · settled_at
+originator_country · beneficiary_country
+is_cross_border · purpose_code
+processing_mode REALTIME|BATCH
+is_aml_processed · ingestion_timestamp"]
+
+    SC_DETAIL["<b>stablecoin_txn_detail</b>
+─────────────────────
+sc_txn_id PK · txn_id FK UNIQUE
+blockchain_tx_hash
+originator_wallet_address
+beneficiary_wallet_address
+block_number · token_standard ERC-20|TRC-20|BEP-20
+token_amount · token_symbol USDT|USDC|HKDG
+is_unhosted_wallet_involved
+ba_risk_score 0-100
+ba_provider CHAINALYSIS|ELLIPTIC|TRM
+ba_risk_flags MIXER|DARKNET|RANSOMWARE
+on_chain_timestamp"]
+
+    TRAVEL_RULE["<b>travel_rule_record</b>  ← AMLO Sch.2 s.13A
+─────────────────────
+travel_rule_id PK · txn_id FK UNIQUE
+compliance_status COMPLIANT|MISSING_DATA|PENDING|FAILED
+originator_name · originator_account_ref
+originator_address · originator_cid_number
+beneficiary_name · beneficiary_account_ref
+beneficiary_institution_lei
+above_hkd8000_threshold  ← zero-threshold approach
+data_transmission_protocol IVMS101|TRISA|OPENVASP
+transmitted_at · missing_fields_list[]"]
+  end
+end
+
+subgraph DETECT["🔍  aml_detection — Screening · Scenarios · Alerts"]
+  direction TB
+
+  SCREENING["<b>screening_result</b>
+─────────────────────
+screening_id PK
+txn_id FK · party_id FK · account_id FK
+screen_type SANCTIONS|PEP|ADVERSE_MEDIA
+BLOCKCHAIN_RISK|HIGH_RISK_COUNTRY
+screen_mode REALTIME|BATCH
+match_status NO_MATCH|POTENTIAL_MATCH
+CONFIRMED_MATCH|FALSE_POSITIVE
+match_score 0-100 · matched_name
+review_decision CLEARED|ESCALATED|BLOCKED
+screened_at · reviewed_at"]
+
+  SCENARIO["<b>detection_scenario</b>
+─────────────────────
+scenario_id PK · scenario_code
+scenario_category STRUCTURING|LAYERING
+PLACEMENT|TRAVEL_RULE_BREACH
+BLOCKCHAIN_RISK|UNHOSTED_WALLET
+VELOCITY|PEP_MONITORING
+applicable_rail FIAT|STABLECOIN|BOTH
+processing_mode REALTIME|BATCH|BOTH
+threshold_config JSONB
+lookback_window_days · severity
+regulatory_reference AMLO|HKMA|FATF
+status ACTIVE|INACTIVE|TESTING"]
+
+  ALERT["<b>aml_alert</b>
+─────────────────────
+alert_id PK · scenario_id FK
+primary_txn_id FK · primary_party_id FK
+alert_type TXN|CUSTOMER|NETWORK|SCREENING|TRAVEL_RULE
+alert_mode REALTIME|BATCH
+alert_status OPEN|UNDER_REVIEW|CLOSED_TP
+CLOSED_FP|ESCALATED
+alert_priority CRITICAL|HIGH|MEDIUM|LOW
+risk_score 0-100 · flagged_amount_hkd
+triggered_rule_detail JSONB
+sla_due_at · assigned_analyst_id FK
+disposition TP|FP|INCONCLUSIVE
+alert_generated_at · closed_at"]
+
+  ALERT_TXN["<b>alert_transaction_link</b>
+─────────────────────
+link_id PK
+alert_id FK · txn_id FK
+link_reason"]
+end
+
+subgraph CASES["📁  aml_case_mgmt — Cases · STR · Activity"]
+  direction TB
+
+  CASE["<b>aml_case</b>
+─────────────────────
+case_id PK · case_reference CASE-2025-HK-00123
+primary_party_id FK
+case_type INVESTIGATION|SAR_PREP|STR_FILED|EDD_REVIEW
+case_status OPEN|UNDER_INVESTIGATION
+PENDING_STR|STR_FILED|CLOSED
+ml_typology STRUCTURING|LAYERING
+CRYPTO_MIXING|DEFI_LAUNDERING|SANCTIONS_EVASION
+total_flagged_amount_hkd
+assigned_analyst_id FK · assigned_supervisor_id FK
+str_filed · str_id FK
+opened_at · sla_due_at · closed_at"]
+
+  CASE_ALERT["<b>case_alert_link</b>
+─────────────────────
+link_id PK
+case_id FK · alert_id FK · linked_at"]
+
+  CASE_PARTY["<b>case_party_link</b>
+─────────────────────
+link_id PK · case_id FK · party_id FK
+party_role SUBJECT|ASSOCIATE|COUNTERPARTY|FACILITATOR"]
+
+  ACTIVITY["<b>case_activity_log</b>
+─────────────────────
+log_id PK · case_id FK
+performed_by_user_id FK
+activity_type CASE_CREATED|ASSIGNED|NOTE_ADDED
+ESCALATED|STR_DRAFTED|STR_SUBMITTED|CLOSED
+old_status · new_status · performed_at"]
+
+  STR["<b>str_report</b>  ← JFIU STREAMS 2
+─────────────────────
+str_id PK · case_id FK
+str_reference JFIU ref no.
+str_status DRAFT|SUBMITTED|ACKNOWLEDGED
+submission_channel STREAMS2_XML|WEBFORM
+reporting_institution_name · LEI
+subject_details name|HKID|DOB|address
+suspicious_activity_description
+reasons_for_suspicion SAFE approach
+applicable_ordinances Cap.405|455|575
+tipping_off_risk_assessed
+activity_period_from · to
+submitted_at · jfiu_case_ref"]
+
+  STR_TXN["<b>str_transaction_link</b>
+─────────────────────
+link_id PK · str_id FK · txn_id FK"]
+end
+
+subgraph GRAPH["🕸️  aml_graph — Network Graph Exploration Layer (Apache AGE)"]
+  direction TB
+
+  subgraph GNODES["Graph Nodes"]
+    G_NODE["<b>graph_node</b>
+─────────────────────
+node_id PK
+node_type PARTY|ACCOUNT|TRANSACTION
+IP_ADDRESS|DEVICE|BLOCKCHAIN_ADDRESS
+INSTITUTION|LEGAL_ENTITY
+node_label · source_entity_id
+source_table · risk_score 0-100
+node_properties JSONB
+is_flagged · flagging_reason
+last_updated_at"]
+
+    G_SCORE_HIST["<b>graph_node_score_history</b>
+─────────────────────
+history_id PK · node_id FK
+previous_score · new_score
+score_delta GENERATED STORED
+change_reason
+changed_at · changed_by_job_id"]
+  end
+
+  subgraph GEDGES["Graph Edges"]
+    G_EDGE["<b>graph_edge</b>
+─────────────────────
+edge_id PK
+source_node_id FK · target_node_id FK
+edge_type SENT_TO|RECEIVED_FROM
+OWNS_ACCOUNT|CONTROLS
+SAME_DEVICE|SAME_IP
+BLOCKCHAIN_TX|SAME_ADDRESS
+edge_weight HKD or frequency
+txn_count · total_amount_hkd
+hop_count · edge_properties JSONB
+event_timestamp"]
+
+    G_EDGE_AGG["<b>graph_edge_daily_agg</b>
+─────────────────────
+agg_id PK · business_date
+source_node_id FK · target_node_id FK
+edge_type · txn_count
+total_amount_hkd · max_single_txn_hkd
+applicable_rail FIAT|STABLECOIN"]
+  end
+
+  subgraph GCOMM["Community Detection"]
+    G_COMMUNITY["<b>graph_community</b>
+─────────────────────
+community_id PK
+community_algorithm LOUVAIN
+LABEL_PROPAGATION|WEAKLY_CONNECTED
+run_date · community_size
+community_risk_score · max_node_risk_score
+total_txn_amount_hkd
+is_suspicious
+investigation_status UNREVIEWED
+UNDER_REVIEW|CLEARED|ESCALATED
+linked_case_id FK
+detected_at · reviewed_at"]
+
+    G_NODE_COMM["<b>graph_node_community</b>
+─────────────────────
+gnc_id PK · node_id FK
+community_id FK · membership_score"]
+  end
+
+  G_ANALYTICS["<b>graph_analytics_run</b>
+─────────────────────
+run_id PK
+algorithm_name PAGERANK
+BETWEENNESS_CENTRALITY
+LOUVAIN_COMMUNITY
+CYCLE_DETECTION|SHORTEST_PATH
+TRIANGLE_COUNT|WEAKLY_CONNECTED
+run_type BATCH|INTERACTIVE
+run_date · triggered_by_alert_id
+triggered_by_case_id
+nodes_analysed · edges_analysed
+suspicious_clusters_found
+started_at · completed_at · status"]
+
+  G_PATH["<b>graph_path_query_cache</b>
+─────────────────────
+query_id PK
+case_id FK · alert_id FK
+source_node_id FK · target_node_id FK
+algorithm SHORTEST_PATH|ALL_PATHS
+result_path_nodes UUID[]
+result_path_edges UUID[]
+result_total_weight · result_hop_count
+result_json JSONB
+queried_at · expires_at
+is_suspicious"]
+end
+
+subgraph REPORTING["📊  aml_reporting — KPI · Batch · Daily Summary"]
+  direction TB
+
+  BATCH["<b>batch_job</b>
+─────────────────────
+job_id PK · job_name
+job_type T1_TM_RUN|T1_SCREENING
+T1_KPI_CALCULATION|T1_GRAPH_REFRESH
+T1_TRAVEL_RULE_CHECK|T1_ALERT_AGING
+T1_WATCHLIST_SYNC
+job_status PENDING|RUNNING|COMPLETED|FAILED
+batch_date T · business_date T-1
+started_at · completed_at
+txn_records_processed · alerts_generated"]
+
+  KPI["<b>kpi_snapshot</b>  ← HKMA KPI Dashboard
+─────────────────────
+kpi_id PK · snapshot_date
+kpi_period DAILY|WEEKLY|MONTHLY|QUARTERLY
+applicable_rail FIAT|STABLECOIN|ALL
+── Volume: active_customers, txn_count, txn_hkd ──
+── Alerts HKMA mandated ──
+total_alerts · alerts_realtime · alerts_batch
+true_positive · false_positive · fp_rate
+── STR HKMA mandated ──
+total_strs_filed
+str_conversion_rate STRs/productive_cases
+alert_to_str_rate
+── Travel Rule stablecoin ──
+travel_rule_compliant · non_compliant
+travel_rule_compliance_rate
+── Operational ──
+alert_rate_per_1000_customers
+avg_alert_review_hours
+sla_breach_count · sla_breach_rate
+── Blockchain Risk ──
+high_risk_blockchain_alerts
+unhosted_wallet_alerts · calculated_at"]
+
+  KPI_RAIL["<b>kpi_daily_rail_breakdown</b>  ← Fiat vs Stablecoin
+─────────────────────
+breakdown_id PK · snapshot_date
+applicable_rail FIAT|STABLECOIN
+txn_count · txn_total_hkd
+txn_cross_border_count · txn_cross_border_hkd
+txn_by_channel JSONB · txn_by_type JSONB
+alerts_total · alerts_critical · alerts_high
+alerts_true_positive · alerts_false_positive
+travel_rule_total · travel_rule_compliant
+travel_rule_above_8k
+travel_rule_above_8k_non_compliant
+unhosted_wallet_txns
+blockchain_risk_alerts · ba_avg_risk_score
+strs_filed · calculated_at"]
+
+  KPI_HEATMAP["<b>kpi_alert_heatmap</b>
+─────────────────────
+heatmap_id PK · snapshot_date
+alert_hour 0-23 · scenario_id FK
+applicable_rail
+alert_count · true_positive_count
+total_amount_hkd · calculated_at"]
+
+  SCEN_KPI["<b>scenario_kpi</b>  ← Annual Tuning Report
+─────────────────────
+scenario_kpi_id PK
+scenario_id FK · snapshot_date · kpi_period
+alerts_generated · true_positives
+false_positives · false_positive_rate
+strs_from_scenario
+avg_risk_score · min · max
+tuning_recommendation
+INCREASE|DECREASE|RETIRE|NO_CHANGE"]
+
+  REG_LOG["<b>regulatory_submission_log</b>
+─────────────────────
+submission_id PK
+submission_type STR_STREAMS2
+HKMA_TM_KPI_QUARTERLY
+HKMA_ANNUAL_TUNING
+STABLECOIN_QUARTERLY
+reporting_period_from · to
+submitted_at · regulator_ref · status"]
+end
+
+subgraph AUDIT["🔒  aml_audit — Users · Immutable Audit Trail"]
+  direction LR
+  USER["<b>aml_user</b>
+─────────────────────
+user_id PK · full_name · email
+role ANALYST_L1|ANALYST_L2|SUPERVISOR
+MLRO|COMPLIANCE_OFFICER
+GRAPH_ANALYST|ADMIN|READONLY
+is_active · last_login_at"]
+
+  AUDIT_LOG["<b>audit_log</b>  ← partitioned by year
+─────────────────────
+audit_id PK · user_id FK
+schema_name · table_name · record_id
+action INSERT|UPDATE|DELETE|VIEW|EXPORT
+old_values JSONB · new_values JSONB
+ip_address · user_agent · performed_at"]
+end
+
+%% ══════════════════════════════════════════════════════════════
+%% RELATIONSHIPS
+%% ══════════════════════════════════════════════════════════════
+PARTY -->|"has docs"| PARTY_DOC
+PARTY -->|"from"| PARTY_REL
+PARTY -->|"to"| PARTY_REL
+PARTY -->|"via"| ACCT_PARTY
+ACCOUNT -->|"via"| ACCT_PARTY
+ACCOUNT -->|"originates"| TXN
+ACCOUNT -->|"receives"| TXN
+PARTY -->|"originator"| TXN
+PARTY -->|"beneficiary"| TXN
+TXN -->|"1:1"| SC_DETAIL
+TXN -->|"1:1 Travel Rule"| TRAVEL_RULE
+TXN -->|"screened"| SCREENING
+PARTY -->|"screened"| SCREENING
+WATCHLIST -.->|"matched"| SCREENING
+SCENARIO -->|"triggers"| ALERT
+ALERT -->|"links"| ALERT_TXN
+TXN -->|"linked"| ALERT_TXN
+ALERT -->|"grouped"| CASE_ALERT
+CASE -->|"contains"| CASE_ALERT
+CASE -->|"involves"| CASE_PARTY
+PARTY -->|"subject"| CASE_PARTY
+CASE -->|"activity"| ACTIVITY
+CASE -->|"STR"| STR
+STR -->|"references"| STR_TXN
+TXN -->|"cited"| STR_TXN
+TXN -.->|"node"| G_NODE
+PARTY -.->|"node"| G_NODE
+ACCOUNT -.->|"node"| G_NODE
+SC_DETAIL -.->|"wallet node"| G_NODE
+G_NODE -->|"score hist"| G_SCORE_HIST
+G_NODE -->|"source"| G_EDGE
+G_NODE -->|"target"| G_EDGE
+G_EDGE -.->|"daily agg"| G_EDGE_AGG
+G_NODE -->|"member"| G_NODE_COMM
+G_COMMUNITY -->|"contains"| G_NODE_COMM
+G_COMMUNITY -->|"escalate"| CASE
+G_ANALYTICS -->|"detects"| G_COMMUNITY
+G_PATH -->|"cached for"| CASE
+SCENARIO -->|"measured"| SCEN_KPI
+BATCH -->|"produces"| KPI
+BATCH -->|"produces"| KPI_RAIL
+BATCH -->|"refreshes"| G_NODE
+ALERT -->|"aggregated"| KPI
+ALERT -->|"heatmap"| KPI_HEATMAP
+STR -->|"counted"| KPI
+TRAVEL_RULE -->|"counted"| KPI_RAIL
+SC_DETAIL -->|"risk counted"| KPI_RAIL
+USER -->|"reviews"| ALERT
+USER -->|"analyst"| CASE
+AUDIT_LOG -->|"by"| USER
+
+%% ══════════════════════════════════════════════════════════════
+%% PROCESSING FLOWS
+%% ══════════════════════════════════════════════════════════════
+subgraph RT_FLOW["⚡ Real-Time Processing Path"]
+  direction LR
+  RT1["Transaction<br/>Ingested"] --> RT2["Sanctions<br/>Screening"] --> RT3["Travel Rule<br/>Check"] --> RT4["Blockchain<br/>Risk Score"] --> RT5["High-Value<br/>Alert"]
+end
+
+subgraph BATCH_FLOW["🕐 T+1 Batch Path  HKT: 00:00 → 06:00"]
+  direction LR
+  B1["00:00 Watchlist<br/>Sync"] --> B2["00:30 Re-<br/>Screening"] --> B3["01:00 TM<br/>Batch Run"] --> B4["03:00 Travel<br/>Rule Audit"] --> B5["04:00 Graph<br/>Refresh"] --> B6["05:00 KPI<br/>Calculation"] --> B7["06:00 Alert<br/>Aging"]
+end
+
+subgraph GRAPH_FLOW["🕸️ Graph Analytics Flow"]
+  direction LR
+  GF1["Graph<br/>Refresh"] --> GF2["Run PageRank<br/>Louvain/Cycle"] --> GF3["Detect<br/>Communities"] --> GF4["Score &<br/>Flag Suspicious"] --> GF5["Escalate<br/>to Case"]
+end
+
+subgraph KPI_FLOW["📊 KPI Daily Summary Flow"]
+  direction LR
+  KF1["T-1 Txns<br/>Alerts STRs"] --> KF2["fn_compute_<br/>daily_kpi"] --> KF3["kpi_snapshot<br/>ALL rails"] --> KF4["kpi_daily_rail_<br/>breakdown FIAT+SC"] --> KF5["scenario_kpi<br/>+ heatmap"] --> KF6["Dashboard<br/>RAG Status"]
+end
+
+%% ══════════════════════════════════════════════════════════════
+%% STYLING
+%% ══════════════════════════════════════════════════════════════
+classDef coreStyle fill:#1a3a5c,stroke:#4a90d9,color:#e0f0ff,rx:6
+classDef detectStyle fill:#3a1a5c,stroke:#9a4ad9,color:#f0e0ff,rx:6
+classDef caseStyle fill:#1a4a2a,stroke:#4ad96a,color:#e0ffe8,rx:6
+classDef graphStyle fill:#4a2a0a,stroke:#d99a4a,color:#fff0e0,rx:6
+classDef reportStyle fill:#3a2a0a,stroke:#d9c44a,color:#fffce0,rx:6
+classDef auditStyle fill:#3a0a0a,stroke:#d94a4a,color:#ffe0e0,rx:6
+classDef flowStyle fill:#0a2a3a,stroke:#4ac4d9,color:#e0f8ff,rx:4
+
+class PARTY,PARTY_DOC,PARTY_REL,WATCHLIST,ACCOUNT,ACCT_PARTY,TXN,SC_DETAIL,TRAVEL_RULE coreStyle
+class SCREENING,SCENARIO,ALERT,ALERT_TXN detectStyle
+class CASE,CASE_ALERT,CASE_PARTY,ACTIVITY,STR,STR_TXN caseStyle
+class G_NODE,G_SCORE_HIST,G_EDGE,G_EDGE_AGG,G_COMMUNITY,G_NODE_COMM,G_ANALYTICS,G_PATH graphStyle
+class BATCH,KPI,KPI_RAIL,KPI_HEATMAP,SCEN_KPI,REG_LOG reportStyle
+class USER,AUDIT_LOG auditStyle
+class RT1,RT2,RT3,RT4,RT5,B1,B2,B3,B4,B5,B6,B7,GF1,GF2,GF3,GF4,GF5,KF1,KF2,KF3,KF4,KF5,KF6 flowStyle

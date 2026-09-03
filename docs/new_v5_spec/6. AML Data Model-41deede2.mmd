@@ -1,0 +1,438 @@
+erDiagram
+    %% ============================================================
+    %% AML DATA MODEL — FIAT & STABLECOIN (HK REGULATORY COMPLIANT)
+    %% Supports: T+1 Batch | Real-Time | Network Graph Exploration
+    %% Regulatory: AMLO Cap.615 | Stablecoins Ordinance Cap.656
+    %%   HKMA AML/CFT Guideline | JFIU STR | FATF Travel Rule
+    %% ============================================================
+
+    party {
+        uuid party_id PK
+        varchar party_type "INDIVIDUAL|CORPORATE|FI|TRUST"
+        varchar full_name
+        varchar hkid_passport_no
+        date date_of_birth
+        char nationality_code "ISO 3166-1"
+        char country_of_residence "ISO 3166-1"
+        varchar registered_address
+        varchar customer_risk_rating "LOW|MEDIUM|HIGH|PEP|SANCTIONED"
+        boolean is_pep
+        boolean is_sanctioned
+        varchar sanctions_list_ref
+        boolean is_beneficial_owner_identified
+        varchar onboarding_channel "FACE_TO_FACE|REMOTE|iAM_SMART"
+        timestamp cdd_last_reviewed_at
+        timestamp edd_required_at
+        boolean is_active
+        timestamp created_at
+    }
+
+    party_document {
+        uuid doc_id PK
+        uuid party_id FK
+        varchar doc_type "HKID|PASSPORT|BR|CI|POA"
+        varchar doc_number
+        date expiry_date
+        char issuing_country
+        boolean is_verified
+        timestamp verified_at
+    }
+
+    party_relationship {
+        uuid rel_id PK
+        uuid party_id_from FK
+        uuid party_id_to FK
+        varchar relationship_type "DIRECTOR|SHAREHOLDER|BENEFICIAL_OWNER|GUARANTOR"
+        numeric ownership_percentage
+        date effective_from
+        date effective_to
+    }
+
+    watchlist_entry {
+        uuid watchlist_id PK
+        varchar list_type "OFAC_SDN|UNSC|EU|HMT|HKMA_SANCTIONED|PEP"
+        varchar listed_name
+        text alias_names
+        varchar entity_type "INDIVIDUAL|ENTITY"
+        date listing_date
+        date delisting_date
+        varchar listing_reason
+        timestamp last_synced_at
+    }
+
+    account {
+        uuid account_id PK
+        varchar account_type "CURRENT|SAVINGS|SVF|STABLECOIN_WALLET|CRYPTO_WALLET"
+        varchar account_rail "FIAT|STABLECOIN"
+        varchar account_number
+        varchar currency_code "HKD|USD|USDT|USDC|HKDG"
+        varchar institution_code "BIC|LEI"
+        varchar account_status "ACTIVE|DORMANT|FROZEN|CLOSED"
+        varchar account_risk_rating
+        numeric current_balance
+        varchar blockchain_address
+        varchar blockchain_network "ETH|TRON|BNB|POLYGON"
+        boolean is_hosted_wallet
+        varchar wallet_custody_type "HOSTED|UNHOSTED|EXCHANGE"
+        timestamp opened_at
+        timestamp created_at
+    }
+
+    account_party_link {
+        uuid link_id PK
+        uuid account_id FK
+        uuid party_id FK
+        varchar role "OWNER|JOINT_HOLDER|AUTHORISED_SIGNATORY|BENEFICIARY"
+        date effective_from
+        date effective_to
+    }
+
+    transaction {
+        uuid txn_id PK
+        varchar txn_reference
+        varchar txn_rail "FIAT|STABLECOIN"
+        varchar txn_channel "SWIFT|CHATS|FPS|JETCO|ACH|BLOCKCHAIN|SVF|CARD"
+        varchar txn_type "CREDIT|DEBIT|TRANSFER|MINT|REDEEM|SWAP|BURN"
+        uuid originator_account_id FK
+        uuid beneficiary_account_id FK
+        uuid originator_party_id FK
+        uuid beneficiary_party_id FK
+        numeric txn_amount
+        varchar txn_currency
+        numeric hkd_equivalent_amount
+        varchar txn_status "PENDING|COMPLETED|FAILED|HELD|BLOCKED"
+        timestamp initiated_at
+        timestamp settled_at
+        char originator_country "ISO 3166-1"
+        char beneficiary_country "ISO 3166-1"
+        boolean is_cross_border
+        varchar purpose_code
+        varchar processing_mode "REALTIME|BATCH"
+        timestamp ingestion_timestamp
+        boolean is_aml_processed
+    }
+
+    stablecoin_txn_detail {
+        uuid sc_txn_id PK
+        uuid txn_id FK
+        varchar blockchain_tx_hash
+        varchar smart_contract_address
+        varchar originator_wallet_address
+        varchar beneficiary_wallet_address
+        bigint block_number
+        varchar token_standard "ERC-20|TRC-20|BEP-20"
+        numeric token_amount
+        varchar token_symbol "USDT|USDC|HKDG|TCHN"
+        boolean is_unhosted_wallet_involved
+        numeric ba_risk_score "Blockchain analytics 0-100"
+        varchar ba_provider "CHAINALYSIS|ELLIPTIC|TRM"
+        text ba_risk_flags "MIXER|DARKNET|RANSOMWARE|SANCTIONS"
+        timestamp on_chain_timestamp
+    }
+
+    travel_rule_record {
+        uuid travel_rule_id PK
+        uuid txn_id FK
+        varchar compliance_status "COMPLIANT|MISSING_DATA|PENDING|FAILED"
+        varchar originator_name
+        varchar originator_account_ref
+        varchar originator_address
+        varchar originator_cid_number
+        varchar beneficiary_name
+        varchar beneficiary_account_ref
+        varchar beneficiary_institution_lei
+        boolean above_hkd8000_threshold "AMLO Sch.2 Sec.13A"
+        varchar data_transmission_protocol "IVMS101|TRISA|OPENVASP"
+        timestamp transmitted_at
+        text missing_fields_list
+    }
+
+    screening_result {
+        uuid screening_id PK
+        uuid txn_id FK
+        uuid party_id FK
+        varchar screen_type "SANCTIONS|PEP|ADVERSE_MEDIA|BLOCKCHAIN_RISK"
+        varchar screen_mode "REALTIME|BATCH"
+        varchar match_status "NO_MATCH|POTENTIAL_MATCH|CONFIRMED_MATCH|FALSE_POSITIVE"
+        numeric match_score
+        varchar matched_watchlist_ref
+        varchar matched_name
+        timestamp screened_at
+        varchar review_decision "CLEARED|ESCALATED|BLOCKED"
+        timestamp reviewed_at
+    }
+
+    detection_scenario {
+        uuid scenario_id PK
+        varchar scenario_code "e.g. SCN_STRUCT_FIAT_01"
+        varchar scenario_name
+        varchar scenario_category "STRUCTURING|LAYERING|PLACEMENT|TRAVEL_RULE_BREACH|BLOCKCHAIN_RISK"
+        varchar applicable_rail "FIAT|STABLECOIN|BOTH"
+        varchar processing_mode "REALTIME|BATCH|BOTH"
+        text scenario_logic_description
+        jsonb threshold_config "Parameterised thresholds"
+        integer lookback_window_days
+        varchar severity "CRITICAL|HIGH|MEDIUM|LOW"
+        varchar status "ACTIVE|INACTIVE|TESTING"
+        varchar regulatory_reference "AMLO|HKMA_GUIDELINE|FATF_REC"
+        date effective_from
+    }
+
+    aml_alert {
+        uuid alert_id PK
+        uuid scenario_id FK
+        uuid primary_txn_id FK
+        uuid primary_party_id FK
+        varchar alert_type "TRANSACTION|CUSTOMER|NETWORK|SCREENING|TRAVEL_RULE"
+        varchar alert_mode "REALTIME|BATCH"
+        varchar alert_status "OPEN|UNDER_REVIEW|CLOSED_TP|CLOSED_FP|ESCALATED"
+        varchar alert_priority "CRITICAL|HIGH|MEDIUM|LOW"
+        numeric risk_score "0-100"
+        text alert_description
+        jsonb triggered_rule_detail
+        numeric flagged_amount_hkd
+        timestamp alert_generated_at
+        uuid assigned_analyst_id FK
+        timestamp sla_due_at
+        varchar disposition "TRUE_POSITIVE|FALSE_POSITIVE|INCONCLUSIVE"
+        timestamp closed_at
+    }
+
+    alert_transaction_link {
+        uuid link_id PK
+        uuid alert_id FK
+        uuid txn_id FK
+        varchar link_reason
+    }
+
+    aml_case {
+        uuid case_id PK
+        varchar case_reference "CASE-2025-HK-00123"
+        uuid primary_party_id FK
+        varchar case_type "INVESTIGATION|SAR_PREPARATION|STR_FILED|EDD_REVIEW"
+        varchar case_status "OPEN|UNDER_INVESTIGATION|PENDING_STR|STR_FILED|CLOSED"
+        varchar case_priority "CRITICAL|HIGH|MEDIUM|LOW"
+        varchar ml_typology "STRUCTURING|LAYERING|CRYPTO_MIXING|SANCTIONS_EVASION"
+        text case_summary
+        numeric total_flagged_amount_hkd
+        uuid assigned_analyst_id FK
+        uuid assigned_supervisor_id FK
+        timestamp opened_at
+        timestamp sla_due_at
+        boolean str_filed
+        uuid str_id FK
+        timestamp created_at
+    }
+
+    case_alert_link {
+        uuid link_id PK
+        uuid case_id FK
+        uuid alert_id FK
+        timestamp linked_at
+    }
+
+    case_party_link {
+        uuid link_id PK
+        uuid case_id FK
+        uuid party_id FK
+        varchar party_role_in_case "SUBJECT|ASSOCIATE|COUNTERPARTY|FACILITATOR"
+    }
+
+    case_activity_log {
+        uuid log_id PK
+        uuid case_id FK
+        uuid performed_by_user_id FK
+        varchar activity_type "ASSIGNED|NOTE_ADDED|ESCALATED|STATUS_CHANGED|STR_SUBMITTED"
+        text activity_description
+        timestamp performed_at
+    }
+
+    str_report {
+        uuid str_id PK
+        uuid case_id FK
+        varchar str_reference "JFIU STREAMS 2 reference"
+        varchar str_status "DRAFT|SUBMITTED|ACKNOWLEDGED|SUPPLEMENTAL"
+        varchar submission_channel "STREAMS2_WEBFORM|STREAMS2_XML"
+        varchar reporting_institution_name
+        varchar reporting_officer_name
+        text subject_details "Name, HKID, DOB, address, accounts"
+        text suspicious_activity_description
+        text reasons_for_suspicion "SAFE approach indicators"
+        text applicable_ordinances "Cap.405|Cap.455|Cap.575"
+        numeric total_amount_reported_hkd
+        boolean tipping_off_risk_assessed
+        date activity_period_from
+        date activity_period_to
+        timestamp submitted_at
+        varchar jfiu_case_ref
+    }
+
+    str_transaction_link {
+        uuid link_id PK
+        uuid str_id FK
+        uuid txn_id FK
+    }
+
+    batch_job {
+        uuid job_id PK
+        varchar job_name
+        varchar job_type "T1_TM_RUN|T1_SCREENING|T1_KPI_CALC|T1_GRAPH_REFRESH|T1_TRAVEL_RULE_CHECK"
+        varchar job_status "PENDING|RUNNING|COMPLETED|FAILED"
+        date batch_date "T: processing date"
+        date business_date "T-1: business date"
+        timestamp started_at
+        timestamp completed_at
+        bigint txn_records_processed
+        bigint alerts_generated
+    }
+
+    kpi_snapshot {
+        uuid kpi_id PK
+        date snapshot_date
+        varchar kpi_period "DAILY|WEEKLY|MONTHLY|QUARTERLY"
+        varchar applicable_rail "FIAT|STABLECOIN|ALL"
+        integer total_active_customers
+        bigint total_transactions_count
+        integer total_alerts_generated
+        integer true_positive_alerts
+        integer false_positive_alerts
+        numeric false_positive_rate "HKMA KPI"
+        integer total_strs_filed
+        numeric str_conversion_rate "HKMA KPI: STRs/Cases"
+        numeric alert_to_str_rate
+        integer travel_rule_compliant_count
+        integer travel_rule_non_compliant_count
+        numeric travel_rule_compliance_rate
+        numeric alert_rate_per_1000_customers "HKMA KPI"
+        numeric avg_alert_review_hours
+        integer sla_breach_count
+        timestamp calculated_at
+    }
+
+    scenario_kpi {
+        uuid scenario_kpi_id PK
+        uuid scenario_id FK
+        date snapshot_date
+        integer alerts_generated
+        integer true_positives
+        integer false_positives
+        numeric false_positive_rate
+        integer strs_from_scenario
+        varchar tuning_recommendation "INCREASE|DECREASE|RETIRE|NO_CHANGE"
+    }
+
+    graph_node {
+        uuid node_id PK
+        varchar node_type "PARTY|ACCOUNT|TRANSACTION|IP_ADDRESS|DEVICE|BLOCKCHAIN_ADDRESS"
+        varchar node_label
+        uuid source_entity_id "FK to source table"
+        varchar source_table "aml_core.party etc."
+        numeric risk_score "0-100"
+        jsonb node_properties "Flexible attributes"
+        boolean is_flagged
+        timestamp last_updated_at
+    }
+
+    graph_edge {
+        uuid edge_id PK
+        uuid source_node_id FK
+        uuid target_node_id FK
+        varchar edge_type "SENT_TO|RECEIVED_FROM|OWNS_ACCOUNT|CONTROLS|SAME_IP|BLOCKCHAIN_TX"
+        numeric edge_weight "Amount HKD or frequency"
+        integer txn_count "Aggregated edge count"
+        numeric total_amount_hkd
+        integer hop_count
+        jsonb edge_properties
+        timestamp event_timestamp
+    }
+
+    graph_community {
+        uuid community_id PK
+        varchar community_algorithm "LOUVAIN|LABEL_PROPAGATION|WEAKLY_CONNECTED"
+        date run_date
+        integer community_size
+        numeric community_risk_score
+        numeric total_txn_amount_hkd
+        boolean is_suspicious
+        varchar investigation_status "UNREVIEWED|UNDER_REVIEW|CLEARED|ESCALATED"
+        uuid linked_case_id FK
+        timestamp detected_at
+    }
+
+    graph_node_community {
+        uuid gnc_id PK
+        uuid node_id FK
+        uuid community_id FK
+        numeric membership_score
+    }
+
+    graph_analytics_run {
+        uuid run_id PK
+        varchar algorithm_name "PAGERANK|BETWEENNESS|LOUVAIN|CYCLE_DETECTION|SHORTEST_PATH"
+        varchar run_type "BATCH|INTERACTIVE"
+        date run_date
+        text run_parameters "JSON"
+        integer nodes_analysed
+        integer edges_analysed
+        integer suspicious_clusters_found
+        timestamp started_at
+        timestamp completed_at
+        varchar status "RUNNING|COMPLETED|FAILED"
+    }
+
+    aml_user {
+        uuid user_id PK
+        varchar full_name
+        varchar email
+        varchar role "ANALYST_L1|ANALYST_L2|SUPERVISOR|MLRO|GRAPH_ANALYST|ADMIN"
+        boolean is_active
+        timestamp created_at
+    }
+
+    audit_log {
+        uuid audit_id PK
+        uuid user_id FK
+        varchar table_name
+        uuid record_id
+        varchar action "INSERT|UPDATE|DELETE|VIEW|EXPORT"
+        jsonb old_values
+        jsonb new_values
+        inet ip_address
+        timestamp performed_at
+    }
+
+    %% ── RELATIONSHIPS ──────────────────────────────────────
+
+    party ||--o{ party_document : "has documents"
+    party ||--o{ party_relationship : "from party"
+    party ||--o{ party_relationship : "to party"
+    party ||--o{ account_party_link : "linked via"
+    account ||--o{ account_party_link : "linked via"
+    account ||--o{ transaction : "originates"
+    account ||--o{ transaction : "receives"
+    party ||--o{ transaction : "originates"
+    party ||--o{ transaction : "receives"
+    transaction ||--o| stablecoin_txn_detail : "extended by"
+    transaction ||--o| travel_rule_record : "has Travel Rule record"
+    transaction ||--o{ screening_result : "screened in"
+    party ||--o{ screening_result : "screened in"
+    detection_scenario ||--o{ aml_alert : "triggers"
+    detection_scenario ||--o{ scenario_kpi : "measured by"
+    aml_alert ||--o{ alert_transaction_link : "links txns"
+    transaction ||--o{ alert_transaction_link : "linked to alert"
+    aml_alert ||--o{ case_alert_link : "grouped in case"
+    aml_case ||--o{ case_alert_link : "contains alerts"
+    aml_case ||--o{ case_party_link : "involves parties"
+    party ||--o{ case_party_link : "subject of case"
+    aml_case ||--o{ case_activity_log : "activity logged"
+    aml_case ||--o| str_report : "results in STR"
+    str_report ||--o{ str_transaction_link : "references txns"
+    transaction ||--o{ str_transaction_link : "cited in STR"
+    aml_case ||--o| graph_community : "linked to community"
+    graph_node ||--o{ graph_edge : "source of edge"
+    graph_node ||--o{ graph_edge : "target of edge"
+    graph_node ||--o{ graph_node_community : "belongs to"
+    graph_community ||--o{ graph_node_community : "contains nodes"
+    aml_alert ||--|| aml_user : "assigned to analyst"
+    aml_case ||--|| aml_user : "assigned analyst"
+    audit_log ||--|| aml_user : "performed by"

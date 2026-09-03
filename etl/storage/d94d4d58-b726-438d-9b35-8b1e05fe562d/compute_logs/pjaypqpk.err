@@ -1,0 +1,7 @@
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69339 - LOGS_CAPTURED - Started capturing logs in process (pid: 69339).
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69339 - check_file_availability - STEP_START - Started execution of step "check_file_availability".
+2026-04-07 12:09:11 +0000 - dagster - INFO - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - check_file_availability - File found and verified for processing: /opt/dagster/input_data/20260407_CUST_TNG.csv
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69339 - check_file_availability - STEP_OUTPUT - Yielded output "filepath" of type "String". (Type check passed).
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - check_file_availability - Writing file at: /opt/dagster/app/storage/d94d4d58-b726-438d-9b35-8b1e05fe562d/check_file_availability/filepath using PickledObjectFilesystemIOManager...
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69339 - check_file_availability - HANDLED_OUTPUT - Handled output "filepath" using IO manager "io_manager"
+2026-04-07 12:09:11 +0000 - dagster - DEBUG - daily_update_job - d94d4d58-b726-438d-9b35-8b1e05fe562d - 69339 - check_file_availability - STEP_SUCCESS - Finished execution of step "check_file_availability" in 238ms.

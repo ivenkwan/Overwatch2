@@ -1,0 +1,28 @@
+2026-04-06 13:01:15 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2915 - LOGS_CAPTURED - Started capturing logs in process (pid: 2915).
+2026-04-06 13:01:15 +0000 - dagster - DEBUG - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2915 - update_age_graph - STEP_START - Started execution of step "update_age_graph".
+2026-04-06 13:01:15 +0000 - dagster - ERROR - __ASSET_JOB - b787d826-a7df-421a-b8db-c4816ef1a29e - 2915 - update_age_graph - STEP_FAILURE - Execution of step "update_age_graph" failed.
+
+dagster._core.errors.DagsterExecutionStepExecutionError: Error occurred while executing op "update_age_graph"::
+
+psycopg2.errors.UndefinedColumn: record "c" has no field "counterparty_id"
+CONTEXT:  SQL statement "SELECT txn_hash, customer_num, counterparty_id, cdi_code, txn_amount_in_hkd, is_merchant 
+                 FROM core.transactions txn
+                 JOIN core.counterparties c ON txn.counterparty_id = c.counterparty_id"
+PL/pgSQL function inline_code_block line 28 at FOR over SELECT rows
+
+
+Stack Trace:
+  File "/usr/local/lib/python3.12/site-packages/dagster/_core/execution/plan/utils.py", line 57, in op_execution_error_boundary
+    yield
+  File "/usr/local/lib/python3.12/site-packages/dagster/_utils/__init__.py", line 394, in iterate_with_context
+    next_output = next(iterator)
+                  ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/dagster/_core/execution/plan/compute_generator.py", line 135, in _coerce_op_compute_fn_to_iterator
+    result = invoke_compute_fn(
+             ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/dagster/_core/execution/plan/compute_generator.py", line 115, in invoke_compute_fn
+    return fn(context, **args_to_pass) if context_arg_provided else fn(**args_to_pass)
+                                                                    ^^^^^^^^^^^^^^^^^^
+  File "/opt/dagster/app/assets/graph_projection.py", line 80, in update_age_graph
+    cursor.execute(sql_script)
+
