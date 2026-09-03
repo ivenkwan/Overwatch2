@@ -23,12 +23,12 @@ def _ttl_seconds() -> int:
         return 15
 
 
-def cache_key(namespace: str, **parts) -> str:
+def cache_key(namespace: str, **parts: Any) -> str:
     ordered = "|".join(f"{k}={parts[k]}" for k in sorted(parts))
     return f"{namespace}:{ordered}"
 
 
-def get(namespace: str, **parts) -> Optional[Any]:
+def get(namespace: str, **parts: Any) -> Optional[Any]:
     key = cache_key(namespace, **parts)
     with _lock:
         entry = _cache.get(key)
@@ -41,7 +41,7 @@ def get(namespace: str, **parts) -> Optional[Any]:
         return value
 
 
-def put(namespace: str, value: Any, ttl: Optional[int] = None, **parts) -> None:
+def put(namespace: str, value: Any, ttl: Optional[int] = None, **parts: Any) -> None:
     if value is None:
         return  # never cache negative results
     key = cache_key(namespace, **parts)
@@ -53,7 +53,7 @@ def put(namespace: str, value: Any, ttl: Optional[int] = None, **parts) -> None:
         _cache[key] = (time.monotonic() + (ttl if ttl is not None else _ttl_seconds()), value)
 
 
-async def cached(namespace: str, loader: Callable, ttl: Optional[int] = None, **parts):
+async def cached(namespace: str, loader: Callable, ttl: Optional[int] = None, **parts: Any) -> Any:
     """Get-or-load helper: returns a cache hit or loads and stores the value."""
     existing = get(namespace, **parts)
     if existing is not None:

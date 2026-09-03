@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .contract import (
-    Capability, Category, Currency, Mode, Rail, Scenario, Severity,
+    Capability, Category, Currency, GraphProfile, Mode, Rail, Scenario, Severity,
 )
 from .currency import BASE_CURRENCY, CurrencyResolver, DEFAULT as DEFAULT_RESOLVER
 
@@ -53,7 +53,7 @@ MONETARY_THRESHOLDS: dict[str, dict[Currency, float]] = {
 }
 
 
-def resolve_params(profile, resolver: CurrencyResolver = DEFAULT_RESOLVER) -> dict[str, Any]:
+def resolve_params(profile: GraphProfile, resolver: CurrencyResolver = DEFAULT_RESOLVER) -> dict[str, Any]:
     """Flat params for ``profile`` — structural defaults + currency-resolved thresholds."""
     params: dict[str, Any] = dict(DEFAULT_PARAMS)
     for key, by_ccy in MONETARY_THRESHOLDS.items():

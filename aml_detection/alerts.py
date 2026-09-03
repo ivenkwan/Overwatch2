@@ -15,12 +15,12 @@ avoid a DB round-trip.
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from .contract import GraphProfile
 
 
-def resolve_columns(cur, alert_table: str) -> set[str]:
+def resolve_columns(cur: Any, alert_table: str) -> set[str]:
     """Introspect the target table's column names from information_schema."""
     schema, _, name = alert_table.rpartition(".")
     schema = schema or "public"
@@ -33,7 +33,7 @@ def resolve_columns(cur, alert_table: str) -> set[str]:
 
 
 class AlertSink:
-    def __init__(self, profile: GraphProfile, cur, columns: Optional[set[str]] = None):
+    def __init__(self, profile: GraphProfile, cur: Any, columns: Optional[set[str]] = None):
         self.profile = profile
         self.cur = cur
         self._columns = columns  # None => introspect lazily on first sink()
@@ -44,7 +44,7 @@ class AlertSink:
             self._columns = resolve_columns(self.cur, self.profile.alert_table)
         return self._columns
 
-    def sink(self, *, scenario, entity_id, tx_hashes, rule_version) -> None:
+    def sink(self, *, scenario: Any, entity_id: Any, tx_hashes: Any, rule_version: str) -> None:
         # Superset of columns the engine may populate. window_* are omitted
         # (the engine does not compute them; they default NULL in the table).
         row = {

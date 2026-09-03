@@ -59,7 +59,7 @@ export default function LoginPage() {
         />
 
         {error && (
-          <p className="mb-4 rounded-lg border border-red-900 bg-red-950 px-3 py-2 text-sm text-red-300">
+          <p role="alert" aria-live="assertive" className="mb-4 rounded-lg border border-red-900 bg-red-950 px-3 py-2 text-sm text-red-300">
             {error}
           </p>
         )}

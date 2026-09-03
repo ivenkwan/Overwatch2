@@ -12,7 +12,7 @@
           "Auth"
         ],
         "summary": "Login For Access Token",
-        "description": "Authenticate user and return JWT token.\nUses PostgreSQL DB to read user credentials.",
+        "description": "Authenticate the user and return an access token. Also sets the\nhttpOnly session cookie so the browser client authenticates without\ntouching the token in JavaScript.",
         "operationId": "login_for_access_token_api_v1_auth_login_post",
         "requestBody": {
           "content": {
@@ -48,6 +48,31 @@
         }
       }
     },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Logout",
+        "description": "Clear the httpOnly session cookie.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/users": {
       "post": {
         "tags": [
@@ -56,6 +81,11 @@
         "summary": "Create User",
         "description": "Provisions a user in Keycloak and maps them to the local `app_users` table \nand hooks them into the executing `tenant`.",
         "operationId": "create_user_api_v1_admin_users_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "x-tenant-id",
@@ -107,6 +137,11 @@
         "summary": "Get Tenant Users",
         "description": "Get all users mapped to the current tenant.",
         "operationId": "get_tenant_users_api_v1_admin_users_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "x-tenant-id",
@@ -159,7 +194,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/users/{local_user_id}/roles": {
@@ -170,6 +210,11 @@
         "summary": "Assign Role",
         "description": "Map a role to a user internally.",
         "operationId": "assign_role_api_v1_admin_users__local_user_id__roles_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "local_user_id",
@@ -230,6 +275,7 @@
           "Alerts"
         ],
         "summary": "Get Monitoring Feed",
+        "description": "Monitoring feed with server-side filters (TASK-012): optional\nminimum amount and transaction-type filters execute in SQL, never in\nthe client. Responses carry short-lived Cache-Control headers.",
         "operationId": "get_monitoring_feed_api_v1_alerts_feed_get",
         "security": [
           {
@@ -243,8 +289,44 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 150,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "min_hkd",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Hkd"
+            }
+          },
+          {
+            "name": "txn_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Txn Type"
             }
           }
         ],
@@ -276,6 +358,7 @@
           "Alerts"
         ],
         "summary": "Get Alerts",
+        "description": "Alert list (currently over core.transactions until the alert table\nexists) with server-side filters (TASK-012).",
         "operationId": "get_alerts_api_v1_alerts__get",
         "security": [
           {
@@ -299,8 +382,44 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "min_hkd",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Hkd"
+            }
+          },
+          {
+            "name": "txn_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Txn Type"
             }
           }
         ],
@@ -745,7 +864,7 @@
           "Graph Explorer"
         ],
         "summary": "Get Network",
-        "description": "Returns generic network topology using Apache AGE for the Unified Workspace.",
+        "description": "Returns generic network topology using Apache AGE for the Unified\nWorkspace. Cursor-style pagination via limit/offset (TASK-011);\nresponses are cached briefly by (limit, offset).",
         "operationId": "get_network_api_v1_graph_network_get",
         "security": [
           {
@@ -759,8 +878,21 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 150,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -815,7 +947,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 5,
+              "maximum": 6,
               "minimum": 1,
               "default": 1,
               "title": "Depth"
@@ -828,6 +960,106 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/kpis/history": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get Kpi History",
+        "description": "Historical KPI trend (TASK-016): last N days from the daily KPI mart\nfor 30/60/90-day charts (N must be a multiple the UI can bucket).",
+        "operationId": "get_kpi_history_api_v1_reports_kpis_history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 7,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/kpis/export.csv": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Export Kpi Csv",
+        "description": "CSV export of the daily KPI mart (TASK-016).",
+        "operationId": "export_kpi_csv_api_v1_reports_kpis_export_csv_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 7,
+              "default": 90,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -894,9 +1126,1197 @@
         ]
       }
     },
+    "/api/v1/str/": {
+      "get": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "List Strs",
+        "description": "Retrieve all STRs for the current tenant.",
+        "operationId": "list_strs_api_v1_str__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/STRResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Strs Api V1 Str  Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Create Str Draft",
+        "description": "Initialize a new STR draft.",
+        "operationId": "create_str_draft_api_v1_str__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/STRCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/str/{str_id}": {
+      "get": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Get Str Detail",
+        "description": "Retrieve a specific STR by its ID.",
+        "operationId": "get_str_detail_api_v1_str__str_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Update Str Draft",
+        "description": "Update fields of a draft STR.",
+        "operationId": "update_str_draft_api_v1_str__str_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/STRUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/review": {
+      "post": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Review Str",
+        "description": "Move a draft STR into review (draft -> under_review).",
+        "operationId": "review_str_api_v1_str__str_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/withdraw": {
+      "post": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Withdraw Str",
+        "description": "Withdraw an STR that is not yet filed.",
+        "operationId": "withdraw_str_api_v1_str__str_id__withdraw_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/versions": {
+      "get": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "List Str Versions",
+        "description": "Version history index for an STR (append-only audit of every change).",
+        "operationId": "list_str_versions_api_v1_str__str_id__versions_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/versions/{version_no}": {
+      "get": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Get Str Version",
+        "description": "Fetch one snapshot from the STR version history.",
+        "operationId": "get_str_version_api_v1_str__str_id__versions__version_no__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          },
+          {
+            "name": "version_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version No"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/export.pdf": {
+      "get": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Export Str Pdf",
+        "description": "Export the STR as a PDF. The content SHA-256 (integrity anchor for\ndigital signing) is returned in the X-Content-Sha256 header.",
+        "operationId": "export_str_pdf_api_v1_str__str_id__export_pdf_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/str/{str_id}/submit": {
+      "post": {
+        "tags": [
+          "STR"
+        ],
+        "summary": "Submit Str",
+        "description": "Finalize and submit the STR to JFIU. Mandatory fields are validated and\nthe filing transition is enforced (draft/under_review -> filed).",
+        "operationId": "submit_str_api_v1_str__str_id__submit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "str_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Str Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/STRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/export": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Export Audit Events",
+        "description": "Export audit events as NDJSON for SIEM ingestion (one JSON object per line).",
+        "operationId": "export_audit_events_api_v1_audit_export_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO timestamp lower bound",
+              "title": "Since"
+            },
+            "description": "ISO timestamp lower bound"
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO timestamp upper bound",
+              "title": "Until"
+            },
+            "description": "ISO timestamp upper bound"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1000,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/verify": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Verify Audit Chain",
+        "description": "Recompute the audit hash chain and report whether it is intact.",
+        "operationId": "verify_audit_chain_api_v1_audit_verify_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/onboarding/challenge": {
+      "get": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Issue Wallet Challenge",
+        "description": "Issue a single-use, TTL-bounded challenge for address-control proofs.",
+        "operationId": "issue_wallet_challenge_api_v1_onboarding_challenge_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wallet_address",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255,
+              "title": "Wallet Address"
+            }
+          },
+          {
+            "name": "blockchain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "ETHEREUM",
+              "title": "Blockchain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/verify": {
+      "post": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Verify Credential",
+        "description": "Verify a KYC/KYB credential and record it against a party (idempotent).",
+        "operationId": "verify_credential_api_v1_onboarding_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/onboarding/wallets": {
+      "post": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Register Wallet",
+        "description": "Maker step: register a wallet authorization (lands UNAUTHORIZED).",
+        "operationId": "register_wallet_api_v1_onboarding_wallets_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletRegistration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "List Wallets",
+        "description": "List wallet authorizations (masked at the API layer per TASK-041).",
+        "operationId": "list_wallets_api_v1_onboarding_wallets_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "only_authorized",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Only Authorized"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/wallets/{instrument_id}/approve": {
+      "post": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Approve Wallet",
+        "description": "Checker step: activate the authorization. Must be a different user\nfrom the maker (maker-checker, TASK-040).",
+        "operationId": "approve_wallet_api_v1_onboarding_wallets__instrument_id__approve_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instrument_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instrument Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/wallets/{instrument_id}/revoke": {
+      "post": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Revoke Wallet",
+        "description": "Deactivate an authorization (revocation kills the risk signal).",
+        "operationId": "revoke_wallet_api_v1_onboarding_wallets__instrument_id__revoke_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instrument_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instrument Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/identity/{party_id}": {
+      "get": {
+        "tags": [
+          "Onboarding (Authorized Wallets)"
+        ],
+        "summary": "Party Verified Identity",
+        "description": "Customer-360 verified-identity panel (AWI TASK-053): the party's\ncredentials (issuer, vct, status, validity window) and wallet\nauthorizations (custody, proof, authorized-until). Claims render masked\nper the caller's role; raw-claim visibility is SENIOR_INVESTIGATOR+ and\nis audited via the standard PII_UNMASKED trail.",
+        "operationId": "party_verified_identity_api_v1_onboarding_identity__party_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "party_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Party Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screening/screen": {
+      "post": {
+        "tags": [
+          "Screening"
+        ],
+        "summary": "Screen",
+        "operationId": "screen_api_v1_screening_screen_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cases/{case_id}/notes": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Add Case Note",
+        "description": "Add a note to a case. Attachment content upload is deferred to the\nobject-store layer (file writes are literal-path confined); metadata\nmay be supplied now.",
+        "operationId": "add_case_note_api_v1_cases__case_id__notes_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "List Case Notes",
+        "operationId": "list_case_notes_api_v1_cases__case_id__notes_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/timeline": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Case Timeline",
+        "description": "Visual timeline of case activity (TASK-015): workflow events plus\naudit actions for the case, newest first.",
+        "operationId": "case_timeline_api_v1_cases__case_id__timeline_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/bulk": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Bulk Case Action",
+        "description": "Bulk status update over a list of case ids (TASK-015).",
+        "operationId": "bulk_case_action_api_v1_cases_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cases/workflow/stale": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Stale Workflows",
+        "description": "TASK-017: surface workflow instances stuck mid-flight (started but\nnever completed/failed) so operators can intervene.",
+        "operationId": "stale_workflows_api_v1_cases_workflow_stale_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health Check",
+        "description": "Liveness/readiness probe: reports DB pool status (TASK-008).",
         "operationId": "health_check_health_get",
         "responses": {
           "200": {
@@ -972,6 +2392,25 @@
         ],
         "title": "Body_login_for_access_token_api_v1_auth_login_post"
       },
+      "CredentialSubmission": {
+        "properties": {
+          "credential": {
+            "type": "string",
+            "minLength": 20,
+            "title": "Credential"
+          },
+          "include_claims": {
+            "type": "boolean",
+            "title": "Include Claims",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "credential"
+        ],
+        "title": "CredentialSubmission"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -997,6 +2436,288 @@
           "role_code"
         ],
         "title": "RoleAssign"
+      },
+      "STRCreate": {
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "triggering_factors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggering Factors"
+          },
+          "subject_background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Background"
+          },
+          "digital_footprints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digital Footprints"
+          },
+          "transaction_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Summary"
+          }
+        },
+        "type": "object",
+        "title": "STRCreate"
+      },
+      "STRResponse": {
+        "properties": {
+          "str_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Str Id"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "triggering_factors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggering Factors"
+          },
+          "subject_background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Background"
+          },
+          "digital_footprints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digital Footprints"
+          },
+          "transaction_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Summary"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "str_id",
+          "tenant_id",
+          "status",
+          "created_at"
+        ],
+        "title": "STRResponse"
+      },
+      "STRUpdate": {
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "triggering_factors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggering Factors"
+          },
+          "subject_background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Background"
+          },
+          "digital_footprints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digital Footprints"
+          },
+          "transaction_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Summary"
+          }
+        },
+        "type": "object",
+        "title": "STRUpdate"
+      },
+      "ScreenRequest": {
+        "properties": {
+          "subject_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Name"
+          },
+          "wallet_address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wallet Address"
+          },
+          "include_internal_blocklist": {
+            "type": "boolean",
+            "title": "Include Internal Blocklist",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ScreenRequest"
       },
       "Token": {
         "properties": {
@@ -1100,6 +2821,89 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WalletRegistration": {
+        "properties": {
+          "party_id": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Party Id"
+          },
+          "blockchain": {
+            "type": "string",
+            "pattern": "^(ETHEREUM|POLYGON|SOLANA|TRON|OTHER)$",
+            "title": "Blockchain"
+          },
+          "wallet_address": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Wallet Address"
+          },
+          "custody_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custody Type"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "challenge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature"
+          },
+          "proof_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proof Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "party_id",
+          "blockchain",
+          "wallet_address"
+        ],
+        "title": "WalletRegistration"
       }
     },
     "securitySchemes": {

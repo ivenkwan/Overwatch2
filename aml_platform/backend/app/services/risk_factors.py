@@ -42,7 +42,7 @@ CUSTODY_RISK = {
     None: 0.7,
 }
 
-HIGH_RISK_JURISDICTIONS = frozenset()  # populated by policy; empty = no flag
+HIGH_RISK_JURISDICTIONS: frozenset = frozenset()  # populated by policy; empty = no flag
 
 
 @dataclass(frozen=True)

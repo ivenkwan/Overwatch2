@@ -1,0 +1,21 @@
+# Mypy configuration (TASK-018).
+#
+# Run:  mypy --config-file pyproject.mypy.toml aml_detection/
+#
+# aml_detection sources are checked under --strict except engine.py, which is
+# DB-execution glue: Apache AGE forces whole-statement Cypher execution (no
+# bind parameters inside the body) and the DB-API cursors are untyped, so
+# strict operator/misc checks there are noise. The rendered statements come
+# exclusively from the abstract registry (renderer tokens are profile-
+# allowlisted) — see engine.py's module docstring.
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# Legacy bare-generic noise (`def f(p: dict)`) — pervasive in registry
+# builder signatures; the alias Params documents intent instead.
+disable_error_code = ["type-arg"]
+exclude = "(tests?|profiles/test_)"
+
+[[tool.mypy.overrides]]
+module = "aml_detection.engine"
+disable_error_code = ["no-untyped-def", "misc", "operator", "no-untyped-call"]

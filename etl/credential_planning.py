@@ -6,9 +6,11 @@ test suite (backend/tests/test_awi_phase1.py).
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 
 
-def plan_status_updates(records, verdicts, now=None):
+def plan_status_updates(records: list, verdicts: list,
+                           now: Optional[datetime] = None) -> dict:
     """Map verification verdicts onto DB updates.
 
     records:  [{credential_id, expires_at, wallet_instruments: [..]}]
@@ -17,7 +19,9 @@ def plan_status_updates(records, verdicts, now=None):
     deauthorizations [instrument_id], dlq [(credential_id, reason)].
     """
     now = now or datetime.now(timezone.utc)
-    credential_updates, deauthorizations, dlq = [], [], []
+    credential_updates: list = []
+    deauthorizations: list = []
+    dlq: list = []
 
     by_index = list(verdicts or [])
     for i, rec in enumerate(records):

@@ -8,7 +8,7 @@ from app.core.config import get_settings, validate_security_config
 from app.core.exceptions import AMLBaseError
 from app.db.session import db_health, init_db_pool, close_db_pool
 from app.logging_config import configure_logging
-from app.services import flowable_client
+from app.services import flowable_client, metrics
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
@@ -39,6 +39,7 @@ app = FastAPI(
 
 import os
 
+app.add_middleware(metrics.MetricsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080").split(","),
@@ -58,6 +59,14 @@ app.include_router(strs.router, prefix="/api/v1/str", tags=["STR"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["Onboarding (Authorized Wallets)"])
 app.include_router(screening.router, prefix="/api/v1/screening", tags=["Screening"])
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus text-format metrics (TASK-022)."""
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(metrics.render(), media_type="text/plain; version=0.0.4")
+
 app.include_router(case_enhance.router, prefix="/api/v1/cases", tags=["Cases"])
 
 @app.get("/health")

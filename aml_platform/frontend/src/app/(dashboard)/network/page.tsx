@@ -141,6 +141,23 @@ export default function NetworkPage() {
             <div className="flex flex-col items-start shrink-0">
               <div className="flex items-center gap-3 bg-slate-950/80 backdrop-blur-xl border border-slate-800/60 rounded-2xl px-5 py-3 shadow-xl">
                 <h3 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Graph Network Voyager</h3>
+                <div className="flex items-center gap-2">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const target = (e.currentTarget.elements.namedItem('entity') as HTMLInputElement).value.trim();
+                      if (target) setSelectedEntity(target);
+                    }}
+                  >
+                    <label htmlFor="entity-search" className="sr-only">Search entity by id</label>
+                    <input
+                      id="entity-search"
+                      name="entity"
+                      placeholder="Search entity id…"
+                      className="bg-slate-900 border border-slate-700/80 text-slate-300 text-xs rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </form>
+                </div>
                 <div className="h-6 w-[1px] bg-slate-800/80" />
                 <select
                   value={minNodes}

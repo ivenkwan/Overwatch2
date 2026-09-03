@@ -21,6 +21,8 @@ import logging
 from .alerts import AlertSink
 from .contract import GraphProfile
 from .currency import DEFAULT as DEFAULT_RESOLVER, CurrencyResolver
+from typing import Any
+
 from .gating import missing_capabilities
 from .registry import SCENARIOS, resolve_params
 from .render import render
@@ -33,18 +35,18 @@ RULE_VERSION = "2026.07-aml-detection-engine"
 
 def detect(
     profile: GraphProfile,
-    conn,
+    conn: Any,
     *,
     resolver: CurrencyResolver = DEFAULT_RESOLVER,
-    sink_class=AlertSink,
-    logger=log,
-) -> dict:
+    sink_class: Any = AlertSink,
+    logger: Any = log,
+) -> dict[str, Any]:
     """Run every applicable scenario against ``profile``'s graph.
 
     Returns a summary dict: {profile, evaluated, skipped, fired, errors}.
     """
     cur = conn.cursor()
-    summary = {"profile": profile.name, "evaluated": 0, "skipped": 0, "fired": 0, "errors": []}
+    summary: dict[str, Any] = {"profile": profile.name, "evaluated": 0, "skipped": 0, "fired": 0, "errors": []}
     try:
         cur.execute("LOAD 'age';")
         cur.execute("SET search_path = ag_catalog, public;")

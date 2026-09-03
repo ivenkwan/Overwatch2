@@ -145,12 +145,12 @@ export default function OnboardingConsolePage() {
         <h1 className="mb-6 text-2xl font-semibold">Authorized-Wallet Onboarding</h1>
 
         {error && (
-          <p className="mb-4 rounded-lg border border-red-900 bg-red-950 px-4 py-2 text-red-300">
+          <p role="alert" aria-live="assertive" className="mb-4 rounded-lg border border-red-900 bg-red-950 px-4 py-2 text-red-300">
             {error}
           </p>
         )}
         {message && (
-          <p className="mb-4 rounded-lg border border-emerald-900 bg-emerald-950 px-4 py-2 text-emerald-300">
+          <p role="status" aria-live="polite" className="mb-4 rounded-lg border border-emerald-900 bg-emerald-950 px-4 py-2 text-emerald-300">
             {message}
           </p>
         )}

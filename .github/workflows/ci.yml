@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests (FastAPI)
+    runs-on: ubuntu-latest
+    env:
+      AUTH_MODE: local
+      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET }}
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    defaults:
+      run:
+        working-directory: aml_platform/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt pytest-asyncio
+      - name: Run test suite
+        run: pytest tests/ -q --ignore=tests/e2e
+
+  detection:
+    name: Unified detection engine (tests + coverage gate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install pytest pytest-cov
+      - name: Unit tests
+        run: python -m pytest aml_detection/ -q
+      - name: Coverage gate (>= 80%)
+        run: python -m pytest aml_detection/ --cov=aml_detection --cov-fail-under=80 -q
+      - name: Type check (mypy strict)
+        run: |
+          pip install mypy
+          mypy --config-file pyproject.mypy.toml aml_detection/
+
+  didvc:
+    name: didvc module (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: didvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Maven test (reactor)
+        run: mvn -f pom.xml -B -q -pl didvc-services -am test
+
+  frontend:
+    name: Frontend typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aml_platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+  lint-and-docs:
+    name: Lint + OpenAPI freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: aml_platform/backend
+        run: pip install -r requirements.txt
+      - name: OpenAPI artifact is current
+        working-directory: .
+        env:
+          AUTH_MODE: local
+          JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET }}
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+        run: |
+          python aml_platform/backend/generate_openapi.py
+          git diff --exit-code docs/openapi.json
