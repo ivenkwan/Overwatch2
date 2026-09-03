@@ -25,7 +25,7 @@ from typing import Any
 
 from .gating import missing_capabilities
 from .registry import SCENARIOS, resolve_params
-from .render import render
+from .render import render_statements
 
 log = logging.getLogger("aml-detection")
 
@@ -65,9 +65,13 @@ def detect(
 
             summary["evaluated"] += 1
             try:
-                query = render(profile, scenario.build_query(params))
-                cur.execute(query)
-                hits = cur.fetchall()
+                # Label-union expansion (AGE rejects 'A|B' patterns): one
+                # statement per label combination; hits are concatenated.
+                statements = render_statements(profile, scenario.build_query(params))
+                hits = []
+                for statement in statements:
+                    cur.execute(statement)
+                    hits.extend(cur.fetchall())
                 fired = 0
                 for entity_id, tx_hashes in hits:
                     sink.sink(

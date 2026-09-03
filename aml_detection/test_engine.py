@@ -40,6 +40,9 @@ class FakeCur:
                 raise RuntimeError(f"simulated failure matching {sub!r}")
 
     def fetchall(self):
+        # A hit row is returned for EVERY label-variant statement (the fake
+        # cannot know which variant a node belongs to); the assertions below
+        # therefore multiply by the per-profile statement count.
         return list(self.hits)
 
     def close(self):
@@ -76,7 +79,8 @@ def test_tap_and_go_skips_cross_rail_and_drift():
     summary = detect(TAP_AND_GO, FakeConn(cur), sink_class=_sink_with(TG_COLS))
     assert summary["skipped"] == 2, summary          # Cross-Rail + Auth Drift
     assert summary["evaluated"] == 6                  # the other 6 scenarios
-    assert summary["fired"] == 6                      # 1 hit each
+    # 6 evaluated scenarios x 6 label-variant statements = 36 sink calls
+    assert summary["fired"] == 36
     assert summary["errors"] == []
 
 
@@ -85,7 +89,8 @@ def test_aml_network_evaluates_all():
     summary = detect(AML_NETWORK, FakeConn(cur), sink_class=_sink_with(AML_COLS))
     assert summary["skipped"] == 0
     assert summary["evaluated"] == 8
-    assert summary["fired"] == 8
+    # 8 evaluated scenarios x 2 label-variant statements = 16 sink calls
+    assert summary["fired"] == 16
     assert summary["errors"] == []
 
 
@@ -98,8 +103,8 @@ def test_one_rule_failure_does_not_halt_the_batch():
     assert summary["errors"] == ["SCN_STRUCT_01"], summary
     assert summary["evaluated"] == 6                  # structuring was attempted (then failed)
     assert cur.rolled_back >= 1                       # the failed rule rolled back
-    # The other 5 evaluated rules still fired and persisted.
-    assert summary["fired"] == 5
+    # The other 5 evaluated rules still fired and persisted (6 variants each).
+    assert summary["fired"] == 5 * 6
 
 
 def test_failed_rule_does_not_drop_prior_alerts():
@@ -119,8 +124,8 @@ def test_alerts_sunk_to_each_profile_table():
     inserts = [(s, p) for s, p in cur.executed if s.startswith("INSERT")]
     assert inserts, "expected alert inserts"
     assert all("ag_catalog.alerts" in s for s, _ in inserts)
-    # Every hit produced an insert (8 scenarios x 1 hit).
-    assert len(inserts) == 8
+    # Every variant statement produced an insert (8 scenarios x 2 variants).
+    assert len(inserts) == 16
 
 
 def test_summary_profile_name():

@@ -2094,6 +2094,23 @@
         ]
       }
     },
+    "/metrics": {
+      "get": {
+        "summary": "Metrics Endpoint",
+        "description": "Prometheus text-format metrics (TASK-022).",
+        "operationId": "metrics_endpoint_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cases/{case_id}/notes": {
       "post": {
         "tags": [

@@ -21,11 +21,22 @@ Token catalogue:
     <<fiat_node>>  -> rail-specific fiat account node pattern
                      (requires a rail property, i.e. aml_network-style profiles)
 
+LABEL-UNION EXPANSION (live-verified on AGE, 2026-09-03): Apache AGE rejects
+multi-label patterns such as ``(a:Entity|SuperNode)`` and
+``[t:PAID|TRANSFERRED*2..5]``. render_statements() therefore expands the
+abstract query into one Cypher statement PER combination of account/transfer
+labels (e.g. tap_and_go 3 account × 2 transfer labels -> 6 statements); the
+engine executes each and concatenates the hits. When a profile has no union
+labels the result is a single statement, identical to the pre-expansion
+behaviour.
+
 This module depends only on ``contract`` (no registry, no DB) — it is a pure
 string transform, fully unit-testable.
 """
 
 from __future__ import annotations
+
+from itertools import product
 
 from .contract import GraphProfile
 
@@ -43,8 +54,9 @@ def _expand_fiat_node(profile: GraphProfile) -> str:
     return f"(fiat:{profile.account_label} {{{profile.prop_rail}: 'FIAT'}})"
 
 
-def render(profile: GraphProfile, abstract_query: str) -> str:
-    """Substitute every ``<<token>>`` in ``abstract_query`` for ``profile``."""
+def _substitute(profile: GraphProfile, abstract_query: str) -> str:
+    """Single-token substitution pass. Account/transfer labels are taken
+    verbatim (callers pre-expand unions into one label per statement)."""
     pd = profile.capabilities.party_dimension
     ad = profile.capabilities.authorization_dimension
     out = abstract_query
@@ -83,3 +95,32 @@ def render(profile: GraphProfile, abstract_query: str) -> str:
         leftovers = sorted({seg.split(">>", 1)[0] for seg in out.split("<<")[1:] if ">>" in seg})
         raise ValueError(f"unresolved <<tokens>> in rendered query for {profile.name!r}: {leftovers}")
     return out
+
+
+def _variant(profile: GraphProfile, abstract_query: str, account: str, transfer: str) -> str:
+    """Render one statement with a single account/transfer label pair."""
+    from dataclasses import replace
+
+    single = replace(profile, account_label=account, transfer_label=transfer)
+    return _substitute(single, abstract_query)
+
+
+def render_statements(profile: GraphProfile, abstract_query: str) -> list[str]:
+    """Render the abstract query into one Cypher statement per label
+    combination (label-union expansion for AGE)."""
+    account_labels = profile.account_label.split("|")
+    transfer_labels = profile.transfer_label.split("|")
+    statements = [
+        _variant(profile, abstract_query, account, transfer)
+        for account, transfer in product(account_labels, transfer_labels)
+    ]
+    return statements
+
+
+def render(profile: GraphProfile, abstract_query: str) -> str:
+    """Back-compat: the FIRST label combination (pre-expansion semantics).
+
+    Engine callers should use render_statements() so every label
+    combination is executed.
+    """
+    return render_statements(profile, abstract_query)[0]

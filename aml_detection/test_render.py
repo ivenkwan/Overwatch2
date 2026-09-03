@@ -24,11 +24,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from aml_detection.gating import is_applicable  # noqa: E402
 from aml_detection.profiles import AML_NETWORK, TAP_AND_GO  # noqa: E402
 from aml_detection.registry import SCENARIOS, resolve_params  # noqa: E402
-from aml_detection.render import render  # noqa: E402
+from aml_detection.render import render, render_statements  # noqa: E402
 
 
 def _render(scenario, profile):
     return render(profile, scenario.build_query(resolve_params(profile)))
+
+
+def _render_all(scenario, profile):
+    return render_statements(profile, scenario.build_query(resolve_params(profile)))
 
 
 # ---------------------------------------------------------------------------
@@ -40,10 +44,10 @@ def test_all_non_gated_scenarios_render_without_leftover_tokens():
         for profile in (AML_NETWORK, TAP_AND_GO):
             if not is_applicable(s, profile):
                 continue  # party/auth-dimension gated for this profile
-            q = _render(s, profile)
-            assert "<<" not in q and ">>" not in q, f"{s.code}@{profile.name}: leftover token\n{q}"
-            assert "RETURN" in q and "agtype" in q, f"{s.code}@{profile.name}: malformed"
-            assert f"cypher('{profile.graph_name}'" in q, f"{s.code}@{profile.name}: wrong graph"
+            for q in _render_all(s, profile):
+                assert "<<" not in q and ">>" not in q, f"{s.code}@{profile.name}: leftover token\n{q}"
+                assert "RETURN" in q and "agtype" in q, f"{s.code}@{profile.name}: malformed"
+                assert f"cypher('{profile.graph_name}'" in q, f"{s.code}@{profile.name}: wrong graph"
 
 
 # ---------------------------------------------------------------------------
@@ -51,21 +55,35 @@ def test_all_non_gated_scenarios_render_without_leftover_tokens():
 # aml_network gets its labels.
 # ---------------------------------------------------------------------------
 
-def test_tap_and_go_label_unions_present():
-    q = _render(SCENARIOS[0], TAP_AND_GO)  # circular
-    assert "Customer|Counterparty|Merchant" in q
-    assert "PAID|TRANSFERRED" in q
+def test_tap_and_go_label_union_expanded_per_statement():
+    # AGE rejects multi-label patterns: render_statements emits one Cypher
+    # statement PER account x transfer label combination.
+    statements = _render_all(SCENARIOS[0], TAP_AND_GO)  # circular
+    assert len(statements) == 3 * 2  # Customer|Counterparty|Merchant x PAID|TRANSFERRED
+    for q in statements:
+        assert "|" not in q.split("cypher")[1].split("$$")[1], f"union leaked into body:\n{q}"
+    assert sum("Customer" in q for q in statements) == 2
+    assert sum("Counterparty" in q for q in statements) == 2
+    assert sum("Merchant" in q for q in statements) == 2
+    assert sum("PAID|TRANSFERRED" in q for q in statements) == 0
+    # aml_network: Entity x SuperNode -> two statements, no unions leaked
+    aml_statements = _render_all(SCENARIOS[6], AML_NETWORK)
+    assert len(aml_statements) == 2
+    bodies = [q.split("cypher")[1].split("$$")[1] for q in aml_statements]
+    assert all("|" not in b for b in bodies)
+    assert any(":Entity" in b and "SuperNode" not in b for b in bodies)
+    assert any(":SuperNode" in b and "Entity {" not in b for b in bodies)
 
 
-def test_variable_length_union_label_rendered():
-    # The riskiest construct: a multi-label variable-length relationship.
-    q = _render(SCENARIOS[0], TAP_AND_GO)
-    assert "[t:PAID|TRANSFERRED*2..5]" in q, f"union var-length not rendered:\n{q}"
+def test_variable_length_relationship_expanded_per_label():
+    # The riskiest construct: multi-label variable-length relationship.
+    statements = _render_all(SCENARIOS[0], TAP_AND_GO)
+    assert all("[t:PAID*2..5]" in q or "[t:TRANSFERRED*2..5]" in q for q in statements)
 
 
 def test_aml_network_labels_present():
     q = _render(SCENARIOS[0], AML_NETWORK)
-    assert "Entity|SuperNode" in q and "[t:Transfer*2..5]" in q
+    assert "Entity" in q and "[t:Transfer*2..5]" in q
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +151,7 @@ def test_cross_rail_renders_for_aml_network():
     q = _render(cr, AML_NETWORK)
     assert ":OWNED_BY" in q and ":UBO_OF*0..3" in q and ":Party" in q
     # <<fiat_node>> expanded to the rail-specific fiat account pattern.
-    assert "(fiat:Entity|SuperNode {system: 'FIAT'})" in q
+    assert "(fiat:Entity {system: 'FIAT'})" in q
     assert "'USDT'" in q and "'USDC'" in q
 
 
@@ -154,21 +172,21 @@ def test_cross_rail_refuses_tap_and_go():
 
 GOLDEN_CIRCULAR_AML = (
     "SELECT * FROM cypher('aml_network', $$\n"
-    "    MATCH pth = (a:Entity|SuperNode)-[t:Transfer*2..5]->(a:Entity|SuperNode)\n"
+    "    MATCH pth = (a:Entity)-[t:Transfer*2..5]->(a:Entity)\n"
     "    RETURN a.id AS entity_id, relationships(pth)\n"
     "$$) as (entity_id agtype, tx_hashes agtype);\n"
 )
 
 GOLDEN_CIRCULAR_TG = (
     "SELECT * FROM cypher('tap_and_go_network', $$\n"
-    "    MATCH pth = (a:Customer|Counterparty|Merchant)-[t:PAID|TRANSFERRED*2..5]->(a:Customer|Counterparty|Merchant)\n"
+    "    MATCH pth = (a:Customer)-[t:PAID*2..5]->(a:Customer)\n"
     "    RETURN a.id AS entity_id, relationships(pth)\n"
     "$$) as (entity_id agtype, tx_hashes agtype);\n"
 )
 
 GOLDEN_STRUCT_AML = (
     "SELECT * FROM cypher('aml_network', $$\n"
-    "    MATCH (a:Entity|SuperNode)-[t:Transfer]->(:Entity|SuperNode)\n"
+    "    MATCH (a:Entity)-[t:Transfer]->(:Entity)\n"
     "    WHERE t.amount_usd < 10000\n"
     "    WITH a, count(t) AS tx_count, sum(t.amount_usd) AS total, collect(t.ref_id) AS tx_hashes\n"
     "    WHERE tx_count >= 5 AND total >= 10000\n"
@@ -178,7 +196,7 @@ GOLDEN_STRUCT_AML = (
 
 GOLDEN_STRUCT_TG = (
     "SELECT * FROM cypher('tap_and_go_network', $$\n"
-    "    MATCH (a:Customer|Counterparty|Merchant)-[t:PAID|TRANSFERRED]->(:Customer|Counterparty|Merchant)\n"
+    "    MATCH (a:Customer)-[t:PAID]->(:Customer)\n"
     "    WHERE t.amount < 8000\n"
     "    WITH a, count(t) AS tx_count, sum(t.amount) AS total, collect(t.txn_hash) AS tx_hashes\n"
     "    WHERE tx_count >= 5 AND total >= 80000\n"
@@ -188,8 +206,8 @@ GOLDEN_STRUCT_TG = (
 
 GOLDEN_RAPID_MVMT_AML = (
     "SELECT * FROM cypher('aml_network', $$\n"
-    "    MATCH (src:Entity|SuperNode)-[tin:Transfer]->(mule:Entity|SuperNode)\n"
-    "    MATCH (mule)-[tout:Transfer]->(dst:Entity|SuperNode)\n"
+    "    MATCH (src:Entity)-[tin:Transfer]->(mule:Entity)\n"
+    "    MATCH (mule)-[tout:Transfer]->(dst:Entity)\n"
     "    WHERE tout.ts >= tin.ts AND tout.ts - tin.ts < 86400\n"
     "    WITH mule, sum(tin.amount_usd) AS in_total, sum(tout.amount_usd) AS out_total,\n"
     "         collect(DISTINCT tin.ref_id) + collect(DISTINCT tout.ref_id) AS tx_hashes\n"
