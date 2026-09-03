@@ -11,6 +11,7 @@ The Overwatch AML (Anti-Money Laundering) Platform is an advanced investigative 
 - **Regulatory Gate**: Pre-graph screening against OFAC, FATF, and internal blocklists.
 - **Automated Analytics (Rule Engine)**: Daily batch execution of typologies such as Circular Flow, Smurfing, and Rapid Movement (Money Mules).
 - **Investigation Workspace**: Unified dashboard for managing prioritized alerts, complete with a visual graph explorer for node neighborhood expansion and evidence export.
+- **First Commercial Use Case**: KYC / KYB for Mainland Chinese Onboarding by integrating with China RealDID
 
 ### Non-Functional Requirements
 - **Security & Compliance**: Evidentiary audit logging, Role-Based Access Control (RBAC), and PII masking.
