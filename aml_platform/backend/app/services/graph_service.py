@@ -103,14 +103,19 @@ def _row_to_elements(r, elements: list, seen_nodes: set) -> None:
     })
 
 
-async def get_full_network(db, limit) -> list:
+async def get_full_network(db, limit, offset: int = 0) -> list:
     limit = clamp_limit(limit)
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        raise InvalidGraphInput("offset must be an integer")
 
+    # openCypher pagination order: SKIP before LIMIT (verified live on AGE).
     query = f"""
     SELECT * FROM cypher('tap_and_go_network', $$
         MATCH (n)-[r]->(m)
         RETURN properties(n), id(n), label(n), properties(r), id(r), label(r), properties(m), id(m), label(m)
-        LIMIT {limit}
+        SKIP {offset} LIMIT {limit}
     $$) AS (n_prop agtype, n_id agtype, n_lbl agtype, r_prop agtype, r_id agtype, r_lbl agtype, m_prop agtype, m_id agtype, m_lbl agtype);
     """
 

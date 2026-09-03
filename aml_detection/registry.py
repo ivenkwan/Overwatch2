@@ -165,6 +165,22 @@ def _q_cross_rail_layering(p: dict) -> str:
     )
 
 
+def _q_authorization_drift(p: dict) -> str:
+    # Requires the authorization dimension; gated by the engine to
+    # auth-capable profiles (TASK-052). Fires when a wallet that WAS
+    # authorized (<<ever_auth>> = true, set at first approval and never
+    # cleared by the projection) transacts while its authorization is no
+    # longer current (<<auth_prop>> = false — revoked credential or manual
+    # deauthorization that the nightly batch applied).
+    return (
+        "SELECT * FROM cypher('<<graph>>', $$\n"
+        "    MATCH (wallet:<<account>>)-[t:<<transfer>>]->(:<<account>>)\n"
+        f"    WHERE wallet.<<ever_auth>> = true AND wallet.<<auth_prop>> = false\n"
+        "    RETURN wallet.id AS entity_id, collect(t.<<ref>>) AS tx_hashes\n"
+        "$$) as (entity_id agtype, tx_hashes agtype);\n"
+    )
+
+
 #: The canonical registry (execution order).
 SCENARIOS: list[Scenario] = [
     Scenario(
@@ -209,6 +225,14 @@ SCENARIOS: list[Scenario] = [
         description="Stablecoin inflow -> fiat outflow under the same UBO within 48h.",
         requires_capabilities=(Capability.PARTY_DIMENSION,),
         build_query=_q_cross_rail_layering,
+    ),
+    Scenario(
+        code="SCN_AUTH_DRIFT_01", name="AUTHORIZATION_DRIFT", category=Category.AUTHORIZATION_DRIFT,
+        rail=Rail.BOTH, mode=Mode.REALTIME, severity=Severity.CRITICAL,
+        description="A previously-authorized wallet transacts while its "
+                    "authorization is no longer current (revoked/expired binding).",
+        requires_capabilities=(Capability.AUTHORIZATION_DIMENSION,),
+        build_query=_q_authorization_drift,
     ),
 ]
 

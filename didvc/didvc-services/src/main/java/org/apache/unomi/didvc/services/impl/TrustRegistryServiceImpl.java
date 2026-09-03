@@ -42,8 +42,21 @@ public class TrustRegistryServiceImpl implements TrustRegistryService {
     @Reference
     private PersistenceService persistenceService;
 
+    /**
+     * Refresh-on-write snapshot of the registry (AWI TASK-056). isTrusted()
+     * previously full-scanned persistence on EVERY verification; with an
+     * issuer/tenant registry this is the per-check cost the feasibility study
+     * flagged (R7). The snapshot is rebuilt only on save/delete, so reads are
+     * in-memory while semantics stay identical to the scan (parity-tested).
+     */
+    private volatile List<TrustEntry> cache = new ArrayList<>();
+
     public void setPersistenceService(PersistenceService persistenceService) {
         this.persistenceService = persistenceService;
+    }
+
+    private void refreshCache() {
+        cache = persistenceService.getAllItems(TrustEntry.class);
     }
 
     @Override
@@ -55,6 +68,7 @@ public class TrustRegistryServiceImpl implements TrustRegistryService {
             entry.setScope("didvc");
         }
         persistenceService.save(entry);
+        refreshCache();
         LOGGER.info("Saved trust entry {} (verifier={}, issuer={}, vct={}, level={})",
                 entry.getItemId(), entry.getTenantId(), entry.getIssuerDid(),
                 entry.getVct(), entry.getAccreditationLevel());
@@ -68,12 +82,13 @@ public class TrustRegistryServiceImpl implements TrustRegistryService {
     @Override
     public void deleteTrustEntry(String entryId) {
         persistenceService.remove(entryId, TrustEntry.class);
+        refreshCache();
     }
 
     @Override
     public List<TrustEntry> getTrustEntries(String verifierTenantId) {
         List<TrustEntry> result = new ArrayList<>();
-        for (TrustEntry entry : persistenceService.getAllItems(TrustEntry.class)) {
+        for (TrustEntry entry : cache) {
             if (verifierTenantId == null || verifierTenantId.equals(entry.getTenantId())) {
                 result.add(entry);
             }
@@ -81,9 +96,10 @@ public class TrustRegistryServiceImpl implements TrustRegistryService {
         return result;
     }
 
-    @Override
-    public boolean isTrusted(String verifierTenantId, String issuerDid, String vct, Date now) {
-        for (TrustEntry entry : persistenceService.getAllItems(TrustEntry.class)) {
+    /** Scan-equivalent check over the in-memory snapshot. */
+    private boolean isTrustedFrom(List<TrustEntry> entries, String verifierTenantId,
+                                  String issuerDid, String vct, Date now) {
+        for (TrustEntry entry : entries) {
             if (!"active".equals(entry.getStatus())) {
                 continue;
             }
@@ -105,5 +121,10 @@ public class TrustRegistryServiceImpl implements TrustRegistryService {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean isTrusted(String verifierTenantId, String issuerDid, String vct, Date now) {
+        return isTrustedFrom(cache, verifierTenantId, issuerDid, vct, now);
     }
 }

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from app.api.v1 import alerts, cases, graph, auth, admin, reports, strs, audit, onboarding
+from app.api.v1 import alerts, cases, graph, auth, admin, reports, strs, audit, onboarding, screening, case_enhance
 from contextlib import asynccontextmanager
 from app.core.config import get_settings, validate_security_config
 from app.core.exceptions import AMLBaseError
@@ -57,6 +57,8 @@ app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(strs.router, prefix="/api/v1/str", tags=["STR"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["Onboarding (Authorized Wallets)"])
+app.include_router(screening.router, prefix="/api/v1/screening", tags=["Screening"])
+app.include_router(case_enhance.router, prefix="/api/v1/cases", tags=["Cases"])
 
 @app.get("/health")
 async def health_check():

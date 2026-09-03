@@ -71,10 +71,10 @@ def _sink_with(columns):
 
 # ---- capability gating -----------------------------------------------------
 
-def test_tap_and_go_skips_cross_rail():
+def test_tap_and_go_skips_cross_rail_and_drift():
     cur = FakeCur(hits=[("E1", ["h1"])])
     summary = detect(TAP_AND_GO, FakeConn(cur), sink_class=_sink_with(TG_COLS))
-    assert summary["skipped"] == 1, summary          # Cross-Rail
+    assert summary["skipped"] == 2, summary          # Cross-Rail + Auth Drift
     assert summary["evaluated"] == 6                  # the other 6 scenarios
     assert summary["fired"] == 6                      # 1 hit each
     assert summary["errors"] == []
@@ -84,8 +84,8 @@ def test_aml_network_evaluates_all():
     cur = FakeCur(hits=[("E1", ["h1"])])
     summary = detect(AML_NETWORK, FakeConn(cur), sink_class=_sink_with(AML_COLS))
     assert summary["skipped"] == 0
-    assert summary["evaluated"] == 7
-    assert summary["fired"] == 7
+    assert summary["evaluated"] == 8
+    assert summary["fired"] == 8
     assert summary["errors"] == []
 
 
@@ -107,8 +107,8 @@ def test_failed_rule_does_not_drop_prior_alerts():
     cur = FakeCur(hits=[("E1", ["h1"])], fail_on=("tx_count",))
     conn = FakeConn(cur)
     detect(AML_NETWORK, conn, sink_class=_sink_with(AML_COLS))
-    # 6 successful rules committed + 1 failed rule rolled back.
-    assert conn.commits == 6
+    # 7 successful rules committed + 1 failed rule rolled back.
+    assert conn.commits == 7
 
 
 # ---- alert sinking ---------------------------------------------------------
@@ -119,8 +119,8 @@ def test_alerts_sunk_to_each_profile_table():
     inserts = [(s, p) for s, p in cur.executed if s.startswith("INSERT")]
     assert inserts, "expected alert inserts"
     assert all("ag_catalog.alerts" in s for s, _ in inserts)
-    # Every hit produced an insert (7 scenarios x 1 hit).
-    assert len(inserts) == 7
+    # Every hit produced an insert (8 scenarios x 1 hit).
+    assert len(inserts) == 8
 
 
 def test_summary_profile_name():

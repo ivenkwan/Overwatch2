@@ -1,9 +1,66 @@
-from fastapi import APIRouter, Depends
+import csv
+import io
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 from app.core.exceptions import database_error
 from app.core import auth
 from app.db.session import get_db
 
 router = APIRouter()
+
+
+@router.get("/kpis/history")
+async def get_kpi_history(
+    days: int = Query(30, ge=7, le=90),
+    current_user: dict = Depends(auth.get_current_user_with_scope("DEPARTMENT_HEAD")),
+    db=Depends(get_db),
+):
+    """Historical KPI trend (TASK-016): last N days from the daily KPI mart
+    for 30/60/90-day charts (N must be a multiple the UI can bucket)."""
+    try:
+        rows = await db.fetch(
+            "SELECT report_date, alert_rate, false_positive_rate, str_conversion_rate, "
+            "first_review_sla_rate, case_cycle_time_days "
+            "FROM mart.daily_aml_kpi "
+            "WHERE report_date >= CURRENT_DATE - ($1 || ' days')::interval "
+            "ORDER BY report_date ASC",
+            str(days),
+        )
+    except Exception as e:
+        raise database_error("reports.kpi_history", e)
+    series = []
+    for row in rows:
+        item = dict(row)
+        item["report_date"] = item["report_date"].isoformat()
+        series.append(item)
+    return {"days": days, "series": series}
+
+
+@router.get("/kpis/export.csv", response_class=PlainTextResponse)
+async def export_kpi_csv(
+    days: int = Query(90, ge=7, le=365),
+    current_user: dict = Depends(auth.get_current_user_with_scope("DEPARTMENT_HEAD")),
+    db=Depends(get_db),
+):
+    """CSV export of the daily KPI mart (TASK-016)."""
+    try:
+        rows = await db.fetch(
+            "SELECT * FROM mart.daily_aml_kpi "
+            "WHERE report_date >= CURRENT_DATE - ($1 || ' days')::interval "
+            "ORDER BY report_date ASC",
+            str(days),
+        )
+    except Exception as e:
+        raise database_error("reports.kpi_export", e)
+    if not rows:
+        return "report_date,no_data\n"
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(rows[0].keys())
+    for row in rows:
+        writer.writerow([getattr(row, k) for k in row.keys()])
+    return buffer.getvalue()
 
 @router.get("/monthly")
 async def get_monthly_report(

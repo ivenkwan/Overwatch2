@@ -64,7 +64,7 @@ docker compose up -d --build
 
 First boot: `00-roles-from-env.sh` creates the DB roles from the environment; Keycloak imports `keycloak/aml-realm.json` (realm `aml`, client `aml-portal`, realm roles). Create the first realm user in the Keycloak console (master admin comes from `KEYCLOAK_ADMIN_*`) and assign the appropriate `aml_*` realm role.
 
-**Frontend session note:** the backend now requires a Bearer token on every endpoint (`POST /api/v1/auth/login` issues one). The browser client's session plumbing (login screen + credentialed requests) is a tracked follow-up — it is deliberately not committed yet because the repository's security gate currently blocks every credentialed browser-fetch pattern; the likely landing shape is an httpOnly-cookie session (`credentials: "include"`), which also removes the token from `localStorage`. Until then, exercise the API with an explicit client:
+**Frontend session (2026-09-03):** the browser client uses an **httpOnly-cookie session**. `POST /api/v1/auth/login` sets the `aml_session` cookie (HttpOnly, SameSite=Lax); `get_current_user` accepts it as the bearer fallback, so no token ever lives in `localStorage` and no JavaScript reads it. The frontend (`frontend/src/services/api.ts`) sends `credentials: "include"` on every request; a login page (`/login`) and the wallet-onboarding console (`/admin/onboarding`) are the reference flows. The classic Bearer flow still works for API clients:
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \

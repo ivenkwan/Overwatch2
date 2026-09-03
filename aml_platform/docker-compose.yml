@@ -28,6 +28,8 @@ services:
       - ./backend/init_scripts/03_keycloak_initialization.sql:/docker-entrypoint-initdb.d/03_keycloak_initialization.sql:ro
       - ./backend/init_scripts/04_str_schema.sql:/docker-entrypoint-initdb.d/04_str_schema.sql:ro
       - ./backend/init_scripts/05_str_compliance.sql:/docker-entrypoint-initdb.d/05_str_compliance.sql:ro
+      - ./backend/init_scripts/06_alert_feed_indexes.sql:/docker-entrypoint-initdb.d/06_alert_feed_indexes.sql:ro
+      - ./backend/init_scripts/06_case_enhancements.sql:/docker-entrypoint-initdb.d/06b_case_enhancements.sql:ro
       - ./backend/init_scripts/07-authorization-model.sql:/docker-entrypoint-initdb.d/07-authorization-model.sql:ro
     healthcheck:
       test: [ "CMD", "pg_isready", "-U", "${POSTGRES_USER:-postgres}", "-d", "${POSTGRES_DB:-age_prod_01}" ]

@@ -16,6 +16,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/roles" className="block px-4 py-2 rounded-md hover:bg-gray-700 transition">
             Role & Access Builder
           </Link>
+          <Link href="/admin/onboarding" className="block px-4 py-2 rounded-md hover:bg-gray-700 transition">
+            Wallet Onboarding Console
+          </Link>
           <Link href="/" className="block px-4 py-2 mt-8 rounded-md text-gray-500 hover:text-white hover:bg-gray-700 transition">
             ← Back to Platform
           </Link>

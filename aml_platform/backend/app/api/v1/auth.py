@@ -11,7 +11,7 @@ never sees or stores the password beyond forwarding this single request.
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core import auth
@@ -21,6 +21,23 @@ from app.db.session import get_db
 from app.services import audit_service
 
 router = APIRouter()
+
+COOKIE_NAME = "aml_session"
+COOKIE_MAX_AGE = 60 * 60 * 12  # 12h session
+
+
+def _set_session_cookie(response: Response, access_token: str) -> None:
+    """Set the httpOnly session cookie carrying the access token (the
+    browser session client relies on it — no token in localStorage)."""
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=access_token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        secure=False,          # terminate TLS at the ingress; flip via env in prod
+        samesite="lax",
+        path="/",
+    )
 
 
 async def _keycloak_password_grant(username: str, password: str) -> dict:
@@ -67,8 +84,14 @@ async def _keycloak_password_grant(username: str, password: str) -> dict:
 
 
 @router.post("/login", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
-    """Authenticate the user and return an access token."""
+async def login_for_access_token(
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db=Depends(get_db),
+):
+    """Authenticate the user and return an access token. Also sets the
+    httpOnly session cookie so the browser client authenticates without
+    touching the token in JavaScript."""
     settings = get_settings()
 
     if settings.auth_mode == AUTH_MODE_KEYCLOAK:
@@ -92,6 +115,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             reason="Keycloak password grant",
             db=db,
         )
+        _set_session_cookie(response, token_payload["access_token"])
         return {
             "access_token": token_payload["access_token"],
             "token_type": "bearer",
@@ -133,4 +157,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         resource_type="AUTH",
         db=db,
     )
+    _set_session_cookie(response, access_token)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+async def logout(response: Response, current_user: dict = Depends(auth.get_current_user)):
+    """Clear the httpOnly session cookie."""
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+    return {"status": "logged_out"}

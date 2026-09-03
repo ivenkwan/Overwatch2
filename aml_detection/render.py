@@ -14,6 +14,10 @@ Token catalogue:
     <<party>>      -> party label            (requires party capability)
     <<owns>>       -> Entity->Party edge     (requires party capability)
     <<ubo>>        -> Party->Party edge      (requires party capability)
+    <<auth_prop>>  -> current-authorization boolean property (requires the
+                     authorization capability)
+    <<ever_auth>>  -> ever-authorized boolean property (never cleared after
+                     first approval; drift detection)
     <<fiat_node>>  -> rail-specific fiat account node pattern
                      (requires a rail property, i.e. aml_network-style profiles)
 
@@ -42,6 +46,7 @@ def _expand_fiat_node(profile: GraphProfile) -> str:
 def render(profile: GraphProfile, abstract_query: str) -> str:
     """Substitute every ``<<token>>`` in ``abstract_query`` for ``profile``."""
     pd = profile.capabilities.party_dimension
+    ad = profile.capabilities.authorization_dimension
     out = abstract_query
     out = out.replace("<<graph>>", profile.graph_name)
     out = out.replace("<<account>>", profile.account_label)
@@ -59,6 +64,15 @@ def render(profile: GraphProfile, abstract_query: str) -> str:
         out = out.replace("<<party>>", pd.party_label)
         out = out.replace("<<owns>>", pd.owns_label)
         out = out.replace("<<ubo>>", pd.ubo_label)
+
+    if "<<auth_prop>>" in out or "<<ever_auth>>" in out:
+        if ad is None:
+            raise ValueError(
+                f"query uses the authorization dimension but profile "
+                f"{profile.name!r} has none (scenario should be capability-gated)"
+            )
+        out = out.replace("<<auth_prop>>", ad.auth_prop)
+        out = out.replace("<<ever_auth>>", ad.ever_auth_prop)
 
     if "<<fiat_node>>" in out:
         out = out.replace("<<fiat_node>>", _expand_fiat_node(profile))

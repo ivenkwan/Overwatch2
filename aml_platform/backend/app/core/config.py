@@ -87,6 +87,9 @@ class Settings:
         self.flowable_password = _env("FLOWABLE_PASSWORD")
         self.flowable_timeout = float(_env("FLOWABLE_TIMEOUT", "10") or "10")
 
+        # Query cache (TASK-011): in-memory TTL fallback; Redis-ready.
+        self.cache_ttl_seconds = int(_env("CACHE_TTL_SECONDS", "15") or "15")
+
         # Database pool (TASK-008).
         self.db_pool_min = int(_env("DB_POOL_MIN", "2") or "2")
         self.db_pool_max = int(_env("DB_POOL_MAX", "20") or "20")

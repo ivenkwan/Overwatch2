@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from aml_detection.gating import is_applicable  # noqa: E402
 from aml_detection.profiles import AML_NETWORK, TAP_AND_GO  # noqa: E402
 from aml_detection.registry import SCENARIOS, resolve_params  # noqa: E402
 from aml_detection.render import render  # noqa: E402
@@ -37,9 +38,8 @@ def _render(scenario, profile):
 def test_all_non_gated_scenarios_render_without_leftover_tokens():
     for s in SCENARIOS:
         for profile in (AML_NETWORK, TAP_AND_GO):
-            if s.needs(__import__("aml_detection.contract", fromlist=["Capability"]).Capability.PARTY_DIMENSION) \
-                    and not profile.has_party:
-                continue  # cross-rail is gated for tap_and_go
+            if not is_applicable(s, profile):
+                continue  # party/auth-dimension gated for this profile
             q = _render(s, profile)
             assert "<<" not in q and ">>" not in q, f"{s.code}@{profile.name}: leftover token\n{q}"
             assert "RETURN" in q and "agtype" in q, f"{s.code}@{profile.name}: malformed"
@@ -66,6 +66,31 @@ def test_variable_length_union_label_rendered():
 def test_aml_network_labels_present():
     q = _render(SCENARIOS[0], AML_NETWORK)
     assert "Entity|SuperNode" in q and "[t:Transfer*2..5]" in q
+
+
+# ---------------------------------------------------------------------------
+# TASK-052: authorization-drift scenario
+# ---------------------------------------------------------------------------
+
+def test_auth_drift_registered_and_gated():
+    from aml_detection.contract import Capability
+    from aml_detection.gating import missing_capabilities
+    from aml_detection.registry import BY_CODE
+
+    drift = BY_CODE["SCN_AUTH_DRIFT_01"]
+    assert Capability.AUTHORIZATION_DIMENSION in drift.requires_capabilities
+    assert not missing_capabilities(drift, AML_NETWORK)   # auth-capable profile
+    assert missing_capabilities(drift, TAP_AND_GO)        # skipped elsewhere
+
+
+def test_auth_drift_renders_ever_and_current_props():
+    from aml_detection.registry import BY_CODE
+
+    q = _render(BY_CODE["SCN_AUTH_DRIFT_01"], AML_NETWORK)
+    assert "ever_authorized = true" in q
+    assert "authorized = false" in q
+    assert "<<" not in q and ">>" not in q
+    assert "RETURN wallet.id AS entity_id" in q
 
 
 # ---------------------------------------------------------------------------

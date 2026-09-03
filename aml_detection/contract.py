@@ -29,6 +29,7 @@ class Category(str, Enum):
     BLOCKCHAIN_RISK = "BLOCKCHAIN_RISK"
     UNHOSTED_WALLET = "UNHOSTED_WALLET"
     PEP_MONITORING = "PEP_MONITORING"
+    AUTHORIZATION_DRIFT = "AUTHORIZATION_DRIFT"
 
 
 class Rail(str, Enum):
@@ -62,6 +63,7 @@ class Currency(str, Enum):
 class Capability(str, Enum):
     """Optional graph dimensions a profile may or may not expose."""
     PARTY_DIMENSION = "PARTY_DIMENSION"
+    AUTHORIZATION_DIMENSION = "AUTHORIZATION_DIMENSION"
 
 
 # ---------------------------------------------------------------------------
@@ -87,12 +89,29 @@ class PartyDimension:
 
 
 @dataclass(frozen=True)
+class AuthorizationDimension:
+    """Concrete labels for the wallet-authorization graph dimension, when
+    present (AWI TASK-052). Relational truth lives in
+    ``app.wallet_authorization``; the graph projection snapshots it onto
+    nodes as two boolean properties:
+      ``auth_prop``      — current authorization (true while authorized)
+      ``ever_auth_prop`` — set true at first approval and never cleared,
+                           so "previously authorized, now not" is testable
+                           (drift detection)."""
+    auth_prop: str          # e.g. 'authorized'
+    ever_auth_prop: str     # e.g. 'ever_authorized'
+
+
+@dataclass(frozen=True)
 class Capabilities:
     party_dimension: Optional[PartyDimension] = None
+    authorization_dimension: Optional[AuthorizationDimension] = None
 
     def supports(self, capability: "Capability") -> bool:
         if capability is Capability.PARTY_DIMENSION:
             return self.party_dimension is not None
+        if capability is Capability.AUTHORIZATION_DIMENSION:
+            return self.authorization_dimension is not None
         return False
 
 

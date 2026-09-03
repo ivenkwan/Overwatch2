@@ -79,6 +79,10 @@ def detect(
                 summary["fired"] += fired
             except Exception as e:  # one bad rule never halts the batch
                 conn.rollback()
+                # Rollback wipes the session search_path set above — restore
+                # it so subsequent rules still resolve ag_catalog.cypher()
+                # (found live on AGE, 2026-09-03).
+                cur.execute("SET search_path = ag_catalog, public;")
                 logger.error("Rule %s failed on %s: %s", scenario.name, profile.name, e)
                 summary["errors"].append(scenario.code)
                 continue

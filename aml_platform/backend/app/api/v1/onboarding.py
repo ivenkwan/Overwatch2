@@ -246,17 +246,19 @@ async def approve_wallet(
     if str(row["authorized_by"]) == str(ctx.user_id):
         raise AuthorizationAppError("Maker and checker must be different users")
 
+    # asyncpg encodes parameters by Python type: pass the datetime object,
+    # NOT an ISO string (a str would fail the timestamptz bind).
     valid_until = datetime.utcnow() + timedelta(days=AUTHZ_MAX_DAYS)
     try:
         updated = await db.fetchrow(
             """
             UPDATE app.wallet_authorization
             SET authorized = TRUE, approved_by = $1,
-                authorized_from = now(), authorized_until = $2::timestamptz
+                authorized_from = now(), authorized_until = $2
             WHERE instrument_id = $3
             RETURNING instrument_id, authorized, authorized_until
             """,
-            str(ctx.user_id), valid_until.isoformat(), instrument_id,
+            str(ctx.user_id), valid_until, instrument_id,
         )
     except Exception as e:
         raise database_error("onboarding.approve_wallet", e)
@@ -342,6 +344,106 @@ async def list_wallets(
         items.append(item)
     return {"status": "success",
             "wallets": pii_service.mask_pii(items, current_user["role"])}
+
+
+@router.get("/identity/{party_id}")
+async def party_verified_identity(
+    party_id: str,
+    current_user: dict = Depends(auth.get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Customer-360 verified-identity panel (AWI TASK-053): the party's
+    credentials (issuer, vct, status, validity window) and wallet
+    authorizations (custody, proof, authorized-until). Claims render masked
+    per the caller's role; raw-claim visibility is SENIOR_INVESTIGATOR+ and
+    is audited via the standard PII_UNMASKED trail."""
+    from app.services import pii_service
+
+    db, ctx = await get_tenant_db(current_user, db)
+
+    try:
+        credentials = await db.fetch(
+            """
+            SELECT credential_id, vct, issuer_did, verified_at, expires_at,
+                   status, evidence_hash, last_checked_at, claims
+            FROM app.party_credential
+            WHERE party_id = $1
+            ORDER BY verified_at DESC
+            """,
+            party_id,
+        )
+        wallets = await db.fetch(
+            """
+            SELECT instrument_id, blockchain, wallet_address, custody_type,
+                   address_proof, proof_ref, authorized, authorized_until
+            FROM app.wallet_authorization
+            WHERE party_id = $1
+            ORDER BY instrument_id
+            """,
+            party_id,
+        )
+    except Exception as e:
+        raise database_error("onboarding.identity", e)
+
+    def _iso_or_none(value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
+
+    cred_items = []
+    for row in credentials:
+        item = dict(row)
+        item["verified_at"] = _iso_or_none(item.get("verified_at"))
+        item["expires_at"] = _iso_or_none(item.get("expires_at"))
+        item["last_checked_at"] = _iso_or_none(item.get("last_checked_at"))
+        # claims ride through the PII masking matrix (TASK-041)
+        cred_items.append(item)
+
+    wallet_items = []
+    for row in wallets:
+        item = dict(row)
+        item["authorized_until"] = _iso_or_none(item.get("authorized_until"))
+        wallet_items.append(item)
+
+    masked_creds = pii_service.mask_pii(cred_items, current_user["role"])
+    # Senior investigators viewing raw claim values are audited (unmask trail).
+    if current_user["role"] in ("SENIOR_INVESTIGATOR", "DEPARTMENT_HEAD", "ADMIN"):
+        for item in cred_items:
+            if item.get("claims"):
+                await audit_service.record_audit_event(
+                    "PII_UNMASKED",
+                    actor=current_user,
+                    resource_type="CREDENTIAL_CLAIMS",
+                    resource_id=item.get("credential_id"),
+                    tenant_id=str(ctx.tenant_id),
+                    db=db,
+                )
+                break  # one audit entry per panel view is sufficient
+
+    return {
+        "party_id": party_id,
+        "credentials": masked_creds,
+        "wallets": pii_service.mask_pii(wallet_items, current_user["role"]),
+    }
+
+
+def build_str_subject_background(identity: dict) -> str:
+    """Pre-fill an STR `subject_background` from the verified-identity panel
+    (AWI TASK-053). `identity` is the JSON from party_verified_identity."""
+    lines = ["Verified identity (credential-based):"]
+    for cred in identity.get("credentials") or []:
+        claims = cred.get("claims") or {}
+        lines.append(
+            f"- {cred.get('vct')} issuer={cred.get('issuer_did')} "
+            f"status={cred.get('status')} valid_until={cred.get('expires_at') or 'n/a'}"
+        )
+    wallets = identity.get("wallets") or []
+    if wallets:
+        lines.append("Linked wallets:")
+        for wallet in wallets:
+            lines.append(
+                f"- {wallet.get('blockchain')} {wallet.get('wallet_address')} "
+                f"authorized={wallet.get('authorized')} custody={wallet.get('custody_type')}"
+            )
+    return "\n".join(lines)
 
 
 def _public_verdict(verdict: dict) -> dict:

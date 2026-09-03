@@ -25,7 +25,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -120,7 +122,77 @@ class TrustRegistryServiceImplTest {
         assertFalse(trustRegistryService.isTrusted("bank-a", "did:web:id.example.hkt", "hkt_kyc_v1", new Date(NOW)));
     }
 
-    private void assertEquals(String expected, String actual) {
-        org.junit.jupiter.api.Assertions.assertEquals(expected, actual);
+    // ---- AWI TASK-056: cached-lookup parity against the full scan ----------
+
+    @Test
+    void cachedLookupParityWithFullScan() {
+        // Seed a mixed registry (two tenants, three issuers, revoked + expired).
+        TrustEntry good = activeEntry("trust-1", "bank-a", "did:web:issuer-a", "hkt_kyc_v1");
+        TrustEntry otherTenant = activeEntry("trust-2", "bank-b", "did:web:issuer-a", "hkt_kyc_v1");
+        TrustEntry secondIssuer = activeEntry("trust-3", "bank-a", "did:web:issuer-b", "hkt_corporate_v1");
+        TrustEntry revoked = activeEntry("trust-4", "bank-a", "did:web:issuer-c", "hkt_kyc_v1");
+        revoked.setStatus("revoked");
+        TrustEntry expired = activeEntry("trust-5", "bank-a", "did:web:issuer-c", "hkt_residency_v1");
+        expired.setValidUntil(new Date(NOW - 1000));
+        trustRegistryService.saveTrustEntry(good);
+        trustRegistryService.saveTrustEntry(otherTenant);
+        trustRegistryService.saveTrustEntry(secondIssuer);
+        trustRegistryService.saveTrustEntry(revoked);
+        trustRegistryService.saveTrustEntry(expired);
+
+        // Full-scan reference: read the persistence layer directly (bypassing
+        // the service cache) and apply the same matching rules.
+        List<org.apache.unomi.didvc.api.items.TrustEntry> scan =
+                persistenceService.getAllItems(org.apache.unomi.didvc.api.items.TrustEntry.class);
+
+        // Every query the service can receive must agree with the scan result.
+        String[] tenants = {"bank-a", "bank-b", "bank-c", null};
+        String[] issuers = {"did:web:issuer-a", "did:web:issuer-b", "did:web:issuer-c", "did:web:none", null};
+        String[] vcts = {"hkt_kyc_v1", "hkt_corporate_v1", "hkt_residency_v1", "hkt_unknown", null};
+        Date now = new Date(NOW);
+        for (String tenant : tenants) {
+            for (String issuer : issuers) {
+                for (String vct : vcts) {
+                    boolean expected = scanMatches(scan, tenant, issuer, vct, now);
+                    assertEquals(expected, trustRegistryService.isTrusted(tenant, issuer, vct, now));
+                }
+            }
+        }
+    }
+
+    @Test
+    void cacheRefreshesOnDelete() {
+        trustRegistryService.saveTrustEntry(activeEntry("trust-1", "bank-a", "did:web:issuer-a", "hkt_kyc_v1"));
+        assertTrue(trustRegistryService.isTrusted("bank-a", "did:web:issuer-a", "hkt_kyc_v1", new Date(NOW)));
+
+        trustRegistryService.deleteTrustEntry("trust-1");
+        assertFalse(trustRegistryService.isTrusted("bank-a", "did:web:issuer-a", "hkt_kyc_v1", new Date(NOW)),
+                "cache must refresh after a delete (no stale trust)");
+    }
+
+    @Test
+    void cacheRefreshesOnUpdate() {
+        TrustEntry entry = activeEntry("trust-1", "bank-a", "did:web:issuer-a", "hkt_kyc_v1");
+        trustRegistryService.saveTrustEntry(entry);
+        assertTrue(trustRegistryService.isTrusted("bank-a", "did:web:issuer-a", "hkt_kyc_v1", new Date(NOW)));
+
+        entry.setStatus("revoked");
+        trustRegistryService.saveTrustEntry(entry);
+        assertFalse(trustRegistryService.isTrusted("bank-a", "did:web:issuer-a", "hkt_kyc_v1", new Date(NOW)),
+                "cache must refresh after an update (no stale trust)");
+    }
+
+    private boolean scanMatches(List<org.apache.unomi.didvc.api.items.TrustEntry> entries,
+                                String tenant, String issuer, String vct, Date now) {
+        for (org.apache.unomi.didvc.api.items.TrustEntry entry : entries) {
+            if (!"active".equals(entry.getStatus())) continue;
+            if (tenant != null && !tenant.equals(entry.getTenantId())) continue;
+            if (issuer != null && !issuer.equals(entry.getIssuerDid())) continue;
+            if (vct != null && !vct.equals(entry.getVct())) continue;
+            if (entry.getValidFrom() != null && entry.getValidFrom().after(now)) continue;
+            if (entry.getValidUntil() != null && !entry.getValidUntil().after(now)) continue;
+            return true;
+        }
+        return false;
     }
 }

@@ -135,7 +135,16 @@ def run_t1_batch_job():
             "INSERT INTO ag_catalog.staging_crypto_raw (tx_hash, sender_wallet, receiver_wallet, asset_id, volume_native, volume_usd, network, transaction_timestamp, status) VALUES %s ON CONFLICT DO NOTHING",
             crypto_staged)
         
-        # 4. Trigger Regulatory Gate
+        # 4. Authorization-aware Regulatory Gate (AWI TASK-049/050):
+        #    attach wallet-authorization metadata, then screen the internal
+        #    revoked-credential blocklist FIRST (quarantines BLOCKED rows so
+        #    the OFAC screen's PENDING->SCREENED promotion never ingests
+        #    them), then run the OFAC screen — which ALWAYS runs, authorized
+        #    or not. No code path skips screening based on authorization.
+        logger.info("Attaching wallet authorization metadata...")
+        cur.execute("CALL public.sp_attach_auth_metadata();")
+        logger.info("Screening internal revoked-credential blocklist...")
+        cur.execute("CALL public.sp_screen_internal_blocklist();")
         logger.info("Evaluating OFAC Sanctions...")
         cur.execute("CALL public.sp_screen_ofac();")
 

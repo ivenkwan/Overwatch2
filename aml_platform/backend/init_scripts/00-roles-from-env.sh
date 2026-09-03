@@ -20,7 +20,7 @@ BEGIN
    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'aml_api_role') THEN
       CREATE ROLE aml_api_role WITH LOGIN PASSWORD '${AML_API_PASSWORD}' NOBYPASSRLS;
    END IF;
-   IF NOT EXISTS (pg_roles WHERE rolname = 'aml_etl_role') THEN
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'aml_etl_role') THEN
       CREATE ROLE aml_etl_role WITH LOGIN PASSWORD '${AML_ETL_PASSWORD}' BYPASSRLS;
    END IF;
    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN

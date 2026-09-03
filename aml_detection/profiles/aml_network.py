@@ -11,7 +11,13 @@ a23ccb9). The DB connection is NOT part of the profile — passed to
 engine.detect().
 """
 
-from ..contract import Capabilities, Currency, GraphProfile, PartyDimension
+from ..contract import (
+    AuthorizationDimension,
+    Capabilities,
+    Currency,
+    GraphProfile,
+    PartyDimension,
+)
 
 AML_NETWORK = GraphProfile(
     name="aml_network",
@@ -30,6 +36,10 @@ AML_NETWORK = GraphProfile(
             party_label="Party",
             owns_label="OWNED_BY",
             ubo_label="UBO_OF",
+        ),
+        authorization_dimension=AuthorizationDimension(
+            auth_prop="authorized",
+            ever_auth_prop="ever_authorized",
         ),
     ),
     alert_table="ag_catalog.alerts",

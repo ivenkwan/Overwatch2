@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import GraphExplorer from '@/components/GraphExplorer';
+import dynamic from 'next/dynamic';
 import { 
   ShieldCheck, 
   BarChart3, 
@@ -11,6 +11,20 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { api } from '@/services/api';
+
+// TASK-013: cytoscape is the heaviest client dependency — it is loaded only
+// when this page mounts, client-side only.
+const GraphExplorer = dynamic(
+  () => import('@/components/GraphExplorer'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 flex items-center justify-center text-slate-400">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    ),
+  }
+);
 
 export default function NetworkPage() {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);

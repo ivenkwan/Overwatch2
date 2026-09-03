@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 
@@ -78,14 +78,21 @@ def _unauthorized(detail: str = "Could not validate credentials") -> HTTPExcepti
     )
 
 
-async def get_current_user(token: Optional[str] = Security(oauth2_scheme)) -> dict:
-    """Validate the Bearer token and return the acting user, or raise 401.
+async def get_current_user(
+    token: Optional[str] = Security(oauth2_scheme),
+    request: Request = None,
+) -> dict:
+    """Validate the access token (Authorization header OR the httpOnly
+    session cookie) and return the acting user, or raise 401.
 
     Fail-closed: missing, malformed, expired, wrongly-signed or
-    wrong-audience tokens are all rejected. Anonymous access is not permitted.
+    wrong-audience tokens are all rejected. Anonymous access is not
+    permitted.
     """
+    if not token and request is not None:
+        token = request.cookies.get("aml_session")
     if not token:
-        raise _unauthorized("Not authenticated: Bearer token required")
+        raise _unauthorized("Not authenticated: Bearer token or session cookie required")
 
     settings = _settings()
     credentials_exception = _unauthorized()

@@ -158,4 +158,10 @@ async def action_case(
         reason=f"action={action_type} task={task_key} new_status={new_db_status} notes={notes}",
         db=db,
     )
+    # TASK-017: keep the workflow-transition trail in the DB (dual-state).
+    from app.api.v1.case_enhance import record_workflow_event
+    await record_workflow_event(
+        db, case_id, instance_id, task_key, "task_completed",
+        {"action": action_type, "new_status": new_db_status or ""},
+    )
     return {"status": "success", "new_status": new_db_status}

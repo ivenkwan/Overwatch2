@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from app.core.exceptions import NotFoundError, database_error
 from typing import List
 from app.services import pii_service, audit_service
@@ -8,36 +9,74 @@ import asyncpg
 
 router = APIRouter()
 
+
+def _jsonable(rows: list) -> list:
+    """Convert DB rows (datetimes/decimals) into JSON-serializable dicts."""
+    from decimal import Decimal
+
+    out = []
+    for row in rows:
+        item = {}
+        for key, value in dict(row).items():
+            if hasattr(value, "isoformat"):
+                item[key] = value.isoformat()
+            elif isinstance(value, Decimal):
+                item[key] = float(value)
+            else:
+                item[key] = value
+        out.append(item)
+    return out
+
 @router.get("/feed")
 async def get_monitoring_feed(
     current_user: dict = Depends(auth.get_current_user),
-    limit: int = 150,
+    limit: int = Query(150, ge=1, le=500),
+    min_hkd: float | None = Query(None, ge=0),
+    txn_type: str | None = Query(None, max_length=32),
     db: asyncpg.Connection = Depends(get_db)
 ):
-    # Fetch real-time ledgers sorted by txn_date desc
+    """Monitoring feed with server-side filters (TASK-012): optional
+    minimum amount and transaction-type filters execute in SQL, never in
+    the client. Responses carry short-lived Cache-Control headers."""
     query = """
-        SELECT txn_hash, customer_num, counterparty_id, txn_date, txn_ref_no, 
-               txn_country, txn_currency, txn_currency_amount, txn_amount_in_hkd, 
-               cdi_code, txn_type 
+        SELECT txn_hash, customer_num, counterparty_id, txn_date, txn_ref_no,
+               txn_country, txn_currency, txn_currency_amount, txn_amount_in_hkd,
+               cdi_code, txn_type
         FROM core.transactions
-        ORDER BY txn_date DESC 
-        LIMIT $1
+        WHERE ($1::float8 IS NULL OR txn_amount_in_hkd >= $1)
+          AND ($2::text IS NULL OR txn_type = $2)
+        ORDER BY txn_date DESC
+        LIMIT $3
     """
-    rows = await db.fetch(query, limit)
-    feed = [dict(row) for row in rows]
-    return pii_service.mask_pii(feed, current_user["role"])
+    rows = await db.fetch(query, min_hkd, txn_type, limit)
+    feed = _jsonable(rows)
+    response = JSONResponse(pii_service.mask_pii(feed, current_user["role"]))
+    response.headers["Cache-Control"] = "private, max-age=5"
+    return response
 
 @router.get("/")
 async def get_alerts(
     current_user: dict = Depends(auth.get_current_user),
     status: str = 'OPEN',
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=500),
+    min_hkd: float | None = Query(None, ge=0),
+    txn_type: str | None = Query(None, max_length=32),
     db: asyncpg.Connection = Depends(get_db)
 ):
-    query = "SELECT * FROM core.transactions LIMIT $1" # Dummy implementation using core.transactions since ag_catalog.alerts doesn't exist
-    rows = await db.fetch(query, limit)
-    alerts = [dict(row) for row in rows]
-    return pii_service.mask_pii(alerts, current_user["role"])
+    """Alert list (currently over core.transactions until the alert table
+    exists) with server-side filters (TASK-012)."""
+    query = """
+        SELECT * FROM core.transactions
+        WHERE ($1::float8 IS NULL OR txn_amount_in_hkd >= $1)
+          AND ($2::text IS NULL OR txn_type = $2)
+        ORDER BY txn_date DESC
+        LIMIT $3
+    """
+    rows = await db.fetch(query, min_hkd, txn_type, limit)
+    alerts = _jsonable(rows)
+    response = JSONResponse(pii_service.mask_pii(alerts, current_user["role"]))
+    response.headers["Cache-Control"] = "private, max-age=5"
+    return response
 
 @router.get("/{alert_id}")
 async def get_alert_detail(
