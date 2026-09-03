@@ -1,4 +1,14 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+/**
+ * Platform API client.
+ *
+ * NOTE ON URL LITERALS: the base below is a fully literal URL — the
+ * repository's security gate requires literal-anchored fetch targets in
+ * browser code. Changing the API origin means updating this constant; the
+ * NEXT_PUBLIC_API_URL override will be restored together with the
+ * cookie-session client (see aml_platform/backend/README.md,
+ * "Frontend session note").
+ */
+const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 
 export const api = {
   async fetchFeed() {

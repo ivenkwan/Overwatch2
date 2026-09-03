@@ -18,7 +18,7 @@ def get_db_connection():
         port=5432,
         database="aml_platform",
         user="aml_admin",
-        password=os.getenv("DB_PASSWORD", "aml_secure_api_password")
+        password=os.environ["DB_PASSWORD"]
     )
 
 def normalize_fiat_swift(raw_swift_json):
@@ -138,13 +138,19 @@ def run_t1_batch_job():
         # 4. Trigger Regulatory Gate
         logger.info("Evaluating OFAC Sanctions...")
         cur.execute("CALL public.sp_screen_ofac();")
-        
+
         conn.commit()
         logger.info("Staged and Screened data.")
     finally:
         cur.close()
         conn.close()
-    
+
+    # 5. Party / UBO graph projection (AWI TASK-039): projects the party
+    # dimension (populated by onboarding) into aml_network so
+    # SCN_CROSS_RAIL_LAYER_01 can traverse instrument -> OWNED_BY -> UBO_OF.
+    import party_loader
+    party_loader.run_party_projection()
+
     logger.info("=== T+1 AML Batch Job Completed ===")
 
 if __name__ == "__main__":

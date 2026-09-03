@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir \
     dagster-webserver \
     polars \
     psycopg2-binary \
-    SQLAlchemy
+    SQLAlchemy \
+    httpx
 
 EXPOSE 3000
 

@@ -7,17 +7,17 @@ from psycopg2.extras import execute_values
 import polars as pl
 from dagster import op, job, schedule, RunRequest, Failure, Out, DefaultScheduleStatus
 
-POSTGRES_URI = os.getenv("POSTGRES_URI", "postgresql://postgres:password@age_db:5432/age_prod_01")
+POSTGRES_URI = os.getenv("POSTGRES_URI", "")
 
 # Use standard mount location, fallback to relative local path
 INPUT_DIR = "/opt/dagster/input_data" if os.path.exists("/opt/dagster/input_data") else os.path.join(os.path.dirname(__file__), "..", "input_data")
 
 def get_db_connection():
-    try:
-        return psycopg2.connect(POSTGRES_URI)
-    except psycopg2.OperationalError:
-        # Fallback to local host mapped port 5433
-        return psycopg2.connect("postgresql://postgres:password@localhost:5433/age_prod_01")
+    # DSN (including credentials) comes exclusively from the environment —
+    # no in-code fallback (TASK-001: no hardcoded secrets).
+    if not POSTGRES_URI:
+        raise Failure("POSTGRES_URI environment variable is required")
+    return psycopg2.connect(POSTGRES_URI)
 
 @op(out={"filepath": Out(str)})
 def check_file_availability(context):

@@ -1,0 +1,51 @@
+{
+  "realm": "aml",
+  "enabled": true,
+  "displayName": "Overwatch AML Platform",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "aml_admin",
+        "description": "Platform administrator (all modules, user provisioning, audit export)"
+      },
+      {
+        "name": "aml_department_head",
+        "description": "Department head (MLRO-level review and approval)"
+      },
+      {
+        "name": "aml_senior_investigator",
+        "description": "Senior investigator (graph exploration, raw PII with audit)"
+      },
+      {
+        "name": "aml_analyst",
+        "description": "L1/L2 analyst (alert review, masked data)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "aml-portal",
+      "name": "AML Portal",
+      "description": "Public web client for the Overwatch AML portal (PKCE / direct access grants)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": ["openid", "profile", "email"],
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+      ]
+    }
+  ],
+  "_comment": "Users are intentionally NOT imported — bootstrap the first admin via the Keycloak console (master realm admin from KEYCLOAK_ADMIN_* env), then assign realm roles (aml_admin, aml_department_head, aml_senior_investigator, aml_analyst) per user."
+}

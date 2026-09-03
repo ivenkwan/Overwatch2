@@ -168,9 +168,17 @@ public class M2mVerificationController {
                 record.put("valid", false);
                 record.put("reason", "credential is missing");
             } else {
-                BearerCredentialVerifier.Outcome outcome = verifier.verify(tenantId, entry.getCredential(), false);
-                record.putAll(verifier.toResponse(outcome));
-                audit(tenantId, entry.getCredential(), outcome);
+                try {
+                    BearerCredentialVerifier.Outcome outcome = verifier.verify(tenantId, entry.getCredential(), false);
+                    record.putAll(verifier.toResponse(outcome));
+                    audit(tenantId, entry.getCredential(), outcome);
+                } catch (RuntimeException e) {
+                    // Fail closed per record: one malformed credential must
+                    // never abort (500) the whole batch.
+                    LOGGER.warn("batch entry {} failed verification", entry.getId(), e);
+                    record.put("valid", false);
+                    record.put("reason", "credential could not be processed");
+                }
             }
             results.add(record);
         }
@@ -187,7 +195,15 @@ public class M2mVerificationController {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "M2M verification is not configured for this edge");
         }
-        if (apiKey == null || apiKey.isEmpty() || !keys.contains(apiKey)) {
+        // F-9 hardening: constant-time comparison against every configured
+        // key (iterating all keys avoids leaking WHICH key matched early).
+        boolean matched = false;
+        for (String key : keys) {
+            if (org.apache.unomi.didvc.edge.security.RedirectGuard.apiKeyMatches(key, apiKey)) {
+                matched = true;
+            }
+        }
+        if (apiKey == null || apiKey.isEmpty() || !matched) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid M2M API key");
         }
     }

@@ -88,6 +88,40 @@ public class EdgeProperties {
      */
     private String demoExternalIssuerVct = "hkt_kyc_v1";
 
+    /**
+     * F-7 hardening: client registry for {@code /authorize} and {@code /par}.
+     * Entries are {@code clientId|redirectUri} pairs matched exactly
+     * (RFC 6749 §3.1.2.3). Sourced from environment only
+     * ({@code DIDVC_EDGE_REDIRECTURIALLOWLIST_0}, ...). An empty list keeps
+     * the demo/conformance behaviour — production must configure it.
+     */
+    private java.util.List<String> redirectUriAllowlist = new java.util.ArrayList<>();
+
+    /**
+     * F-12 hardening: wallet endpoints the browser-facing
+     * {@code GET /{tenant}/vp/authorize} may redirect to (exact match).
+     * Sourced from environment only
+     * ({@code DIDVC_EDGE_WALLETENDPOINTALLOWLIST_0}, ...). An empty list
+     * keeps the demo behaviour — production must configure it.
+     */
+    private java.util.List<String> walletEndpointAllowlist = new java.util.ArrayList<>();
+
+    public java.util.List<String> getRedirectUriAllowlist() {
+        return redirectUriAllowlist;
+    }
+
+    public void setRedirectUriAllowlist(java.util.List<String> redirectUriAllowlist) {
+        this.redirectUriAllowlist = redirectUriAllowlist;
+    }
+
+    public java.util.List<String> getWalletEndpointAllowlist() {
+        return walletEndpointAllowlist;
+    }
+
+    public void setWalletEndpointAllowlist(java.util.List<String> walletEndpointAllowlist) {
+        this.walletEndpointAllowlist = walletEndpointAllowlist;
+    }
+
     public String getIssuerBaseUrl() {
         return issuerBaseUrl;
     }

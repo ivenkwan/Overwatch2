@@ -50,7 +50,7 @@ def get_db_connection():
         port=int(os.getenv("DB_PORT", "5432")),
         database=os.getenv("DB_NAME", "aml_platform"),
         user=os.getenv("DB_USER", "aml_admin"),
-        password=os.getenv("DB_PASSWORD", "aml_secure_api_password"),
+        password=os.environ["DB_PASSWORD"],
     )
 
 

@@ -1,0 +1,23 @@
+# Credential Edge container (AWI TASK-032).
+# Build from the repository root after `mvn -f didvc/pom.xml -DskipTests package`:
+#   docker build -f didvc/docker/Dockerfile.edge -t didvc-edge:dev .
+FROM eclipse-temurin:17-jre
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system didvc && adduser --system --ingroup didvc didvc
+
+WORKDIR /opt/didvc
+COPY --chown=didvc:didvc didvc/didvc-edge/target/unomi-did-vc-edge-*.jar /opt/didvc/didvc-edge.jar
+
+USER didvc
+EXPOSE 8080
+
+# Demo profile: in-memory platform issuing genuine SD-JWTs (pilot only —
+# F-13: NEVER use the demo profile in production; use prod with vault
+# config, see application-prod.yml).
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
+  CMD curl -sf http://localhost:8080/demo/issuer-kid > /dev/null || exit 1
+
+ENTRYPOINT ["java", "-jar", "/opt/didvc/didvc-edge.jar"]
+CMD ["--spring.profiles.active=demo"]

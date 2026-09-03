@@ -1,0 +1,69 @@
+# Production profile for the Credential Edge (AWI TASK-054 / TASK-055).
+#
+# Activates the production store swaps that the security review requires:
+#   - Redis nonce store (replay protection survives restarts / scales out)
+#   - TLS at the edge with mutual-TLS client authentication for the
+#     trusted ingress + backend callers (TASK-055)
+#   - Kafka metering / manifest-result sinks
+# Every value resolves from environment variables — no credentials or
+# endpoints are committed. Deploy with:
+#   --spring.profiles.active=prod
+# NEVER combine with the demo profile (F-13).
+
+spring:
+  data:
+    redis:
+      host: ${DIDVC_REDIS_HOST:localhost}
+      port: ${DIDVC_REDIS_PORT:6379}
+      password: ${DIDVC_REDIS_PASSWORD:}       # vault-provisioned; empty = no AUTH
+      timeout: 5s
+
+didvc:
+  edge:
+    # F-10-adjacent: durable, shared nonce store
+    redis-enabled: true
+    # Public identity of this edge (issuer identifier base)
+    issuer-base-url: ${DIDVC_EDGE_ISSUER_BASE_URL:https://didvc-edge.example.com}
+    # Platform (Karaf/didvc-rest) connection
+    platform-base-url: ${DIDVC_PLATFORM_BASE_URL:http://didvc-platform:8181}
+    platform-api-key: ${DIDVC_PLATFORM_API_KEY:}
+    # API keys (vault-provisioned; empty m2m list keeps M2M closed)
+    internal-api-key: ${DIDVC_EDGE_INTERNAL_API_KEY:}
+    m2m-api-keys: ${DIDVC_EDGE_M2M_API_KEYS:}
+    # F-7: client registry — REQUIRED in production. Entries: clientId|redirectUri
+    redirect-uri-allowlist: ${DIDVC_EDGE_REDIRECT_URI_ALLOWLIST:}
+    # F-12: browser-facing wallet endpoints — REQUIRED before public exposure
+    wallet-endpoint-allowlist: ${DIDVC_EDGE_WALLET_ENDPOINT_ALLOWLIST:}
+    # Kafka sinks (metering / manifest verification results)
+    manifest-kafka-bootstrap-servers: ${DIDVC_KAFKA_BOOTSTRAP:}
+    manifest-kafka-topic: ${DIDVC_MANIFEST_KAFKA_TOPIC:didvc-manifest-verification}
+
+server:
+  # TASK-055: TLS termination at the edge with mTLS for trusted callers.
+  # Keystore/truststore paths + passwords come from vault-mounted files.
+  ssl:
+    enabled: ${DIDVC_TLS_ENABLED:true}
+    key-store: ${DIDVC_TLS_KEYSTORE:file:/var/run/didvc/tls/keystore.p12}
+    key-store-password: ${DIDVC_TLS_KEYSTORE_PASSWORD:}
+    key-store-type: PKCS12
+    trust-store: ${DIDVC_TLS_TRUSTSTORE:file:/var/run/didvc/tls/truststore.p12}
+    trust-store-password: ${DIDVC_TLS_TRUSTSTORE_PASSWORD:}
+    trust-store-type: PKCS12
+    client-auth: need          # mTLS: callers present a client certificate
+  # Restarts drop in-flight requests cleanly
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.apache.unomi.didvc: INFO

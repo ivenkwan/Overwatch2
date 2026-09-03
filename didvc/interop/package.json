@@ -1,11 +1,11 @@
 {
   "name": "unomi-didvc-interop-wallet",
   "private": true,
-  "description": "Reference-wallet round trip and load test for the unomi-did-vc credential edge, built on the OpenWallet Foundation @openid4vc client libraries (third-party OID4VCI/OID4VP implementation) plus jose.",
+  "description": "Reference-wallet round trip for the unomi-did-vc credential edge, built on the OpenWallet Foundation @openid4vc client libraries (third-party OID4VCI/OID4VP implementation) plus jose. The load driver is load_test.py (Python: httpx + cryptography).",
   "type": "module",
   "scripts": {
     "roundtrip": "tsx wallet-roundtrip.ts",
-    "loadtest": "tsx load-test.ts"
+    "loadtest": "python3 load_test.py"
   },
   "dependencies": {
     "@openid4vc/oauth2": "0.5.5",

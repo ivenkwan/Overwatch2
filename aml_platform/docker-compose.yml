@@ -1,4 +1,7 @@
-version: '3.8'
+# All credentials are interpolated from the environment / .env file
+# (TASK-001: no credential literals in source). See .env.example.
+# NOTE: existing volumes initialised with the old literals must be recreated
+# (`docker compose down -v`) for the new env-sourced roles to take effect.
 
 services:
   # 1. Database: AGE Data storage
@@ -6,20 +9,28 @@ services:
     image: apache/age
     container_name: aml-age-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: age_prod_01
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-age_prod_01}
       PGDATA: /var/lib/postgresql/data/pgdata
+      # Consumed by 00-roles-from-env.sh on first initialisation only
+      AML_API_PASSWORD: ${AML_API_PASSWORD:?AML_API_PASSWORD must be set}
+      AML_ETL_PASSWORD: ${AML_ETL_PASSWORD:?AML_ETL_PASSWORD must be set}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD must be set}
     ports:
       - "5433:5432"
     volumes:
-      - aml_pgdata:/var/lib/postgresql/data
-      - ../etl/sql/init_schema.sql:/docker-entrypoint-initdb.d/00_init_schema.sql
-      - ./backend/init_scripts/01_rbac_initialization.sql:/docker-entrypoint-initdb.d/01_rbac_initialization.sql
-      - ./backend/init_scripts/02_audit_tamper_evidence.sql:/docker-entrypoint-initdb.d/02_audit_tamper_evidence.sql
-      - ./backend/init_scripts/03_keycloak_initialization.sql:/docker-entrypoint-initdb.d/03_keycloak_initialization.sql
+      - aml_pgdata:/var/lib/postgresql/data/pgdata
+      - ./backend/init_scripts/00-roles-from-env.sh:/docker-entrypoint-initdb.d/00-roles-from-env.sh:ro
+      - ../etl/sql/init_schema.sql:/docker-entrypoint-initdb.d/00_init_schema.sql:ro
+      - ./backend/init_scripts/01_rbac_initialization.sql:/docker-entrypoint-initdb.d/01_rbac_initialization.sql:ro
+      - ./backend/init_scripts/02_audit_tamper_evidence.sql:/docker-entrypoint-initdb.d/02_audit_tamper_evidence.sql:ro
+      - ./backend/init_scripts/03_keycloak_initialization.sql:/docker-entrypoint-initdb.d/03_keycloak_initialization.sql:ro
+      - ./backend/init_scripts/04_str_schema.sql:/docker-entrypoint-initdb.d/04_str_schema.sql:ro
+      - ./backend/init_scripts/05_str_compliance.sql:/docker-entrypoint-initdb.d/05_str_compliance.sql:ro
+      - ./backend/init_scripts/07-authorization-model.sql:/docker-entrypoint-initdb.d/07-authorization-model.sql:ro
     healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "postgres", "-d", "age_prod_01" ]
+      test: [ "CMD", "pg_isready", "-U", "${POSTGRES_USER:-postgres}", "-d", "${POSTGRES_DB:-age_prod_01}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,10 +44,13 @@ services:
     container_name: aml-dagster-etl
     restart: always
     env_file:
-      - ../etl/.env
+      # Optional extra Dagster/ETL configuration (see etl/.env.example);
+      # required variables are set explicitly in `environment` below.
+      - path: ../etl/.env
+        required: false
     environment:
       DAGSTER_HOME: /opt/dagster/app
-      POSTGRES_URI: postgresql://postgres:password@age_db:5432/age_prod_01
+      POSTGRES_URI: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@age_db:5432/${POSTGRES_DB:-age_prod_01}
     ports:
       - "3001:3000"
     volumes:
@@ -46,6 +60,17 @@ services:
       age_db:
         condition: service_healthy
     command: dagster dev -h 0.0.0.0 -p 3000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:3000', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
     networks:
       - aml-network
 
@@ -56,38 +81,79 @@ services:
       dockerfile: Dockerfile
     container_name: aml-fastapi-backend
     env_file:
-      - .env
+      # Optional per-deployment settings (see .env.example). Secrets are
+      # fail-fast required either here or in the shell environment; the app
+      # re-validates at startup.
+      - path: .env
+        required: false
     environment:
-      DATABASE_URL: postgresql://aml_api_role:aml_secure_api_password@age_db:5432/age_prod_01
+      DATABASE_URL: postgresql://aml_api_role:${AML_API_PASSWORD}@age_db:5432/${POSTGRES_DB:-age_prod_01}
+      AUTH_MODE: ${AUTH_MODE:-keycloak}
+      KEYCLOAK_URL: http://keycloak:8080
+      JSON_LOGS: ${JSON_LOGS:-1}
+      FLOWABLE_USER: ${FLOWABLE_USER:-}
+      FLOWABLE_PASSWORD: ${FLOWABLE_PASSWORD:-}
+      IDENTITY_PROVIDER_URL: ${IDENTITY_PROVIDER_URL:-}
+      IDENTITY_PROVIDER_API_KEY: ${IDENTITY_PROVIDER_API_KEY:-}
+      IDENTITY_PROVIDER_TENANT: ${IDENTITY_PROVIDER_TENANT:-aml}
       ENV: production
     ports:
       - "8000:8000"
     depends_on:
       age_db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     networks:
       - aml-network
 
   # 4. Keycloak: Identity Management
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
-    command: start-dev
+    command: start-dev --import-realm
     container_name: aml-keycloak
     environment:
-      # These bootstrap credentials will create the master realm admin
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Bootstrap admin for the master realm (create the first real admin,
+      # then rotate these away)
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://age_db:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
     ports:
       - "8080:8080"
+    volumes:
+      - ./keycloak/aml-realm.json:/opt/keycloak/data/import/aml-realm.json:ro
     depends_on:
       age_db:
         condition: service_healthy
+    healthcheck:
+      # Any HTTP response (incl. 404/redirect) proves the server is up.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /realms/master HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q HTTP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1280M
     networks:
       - aml-network
 
@@ -98,12 +164,24 @@ services:
       dockerfile: Dockerfile
     container_name: aml-nextjs-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
     ports:
       - "3000:3000"
     depends_on:
-      - aml-backend
+      aml-backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - aml-network
 
@@ -112,16 +190,56 @@ services:
     image: flowable/flowable-rest:latest
     container_name: aml-flowable
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://age_db:5432/age_prod_01?currentSchema=public
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://age_db:5432/${POSTGRES_DB:-age_prod_01}?currentSchema=public
       - SPRING_DATASOURCE_USERNAME=aml_api_role
-      - SPRING_DATASOURCE_PASSWORD=aml_secure_api_password
+      - SPRING_DATASOURCE_PASSWORD=${AML_API_PASSWORD}
       - SPRING_DATASOURCE_DRIVER-CLASS-NAME=org.postgresql.Driver
     ports:
       - "8081:8080" # Using 8081 to avoid conflict with keycloak on 8080
     depends_on:
       age_db:
         condition: service_healthy
+    healthcheck:
+      # Liveness: any HTTP response (even 401) proves the REST app is serving.
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/flowable-rest/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1280M
+    networks:
+      - aml-network
+
+  # 7. didvc Credential Edge (AWI TASK-032) — authorized-wallet identity
+  #    provider (demo pilot profile). Enable with: docker compose --profile awi up
+  #    Build the jar first:  mvn -f didvc/pom.xml -DskipTests package
+  didvc-edge:
+    build:
+      context: ../
+      dockerfile: didvc/docker/Dockerfile.edge
+    container_name: aml-didvc-edge
+    profiles: ["awi"]
+    environment:
+      SPRING_PROFILES_ACTIVE: demo   # pilot only — use prod profile + vault for real deployments
+      DIDVC_EDGE_ISSUER_BASE_URL: ${DIDVC_EDGE_ISSUER_BASE_URL:-http://didvc-edge:8080}
+      DIDVC_EDGE_INTERNAL_API_KEY: ${DIDVC_EDGE_INTERNAL_API_KEY:?DIDVC_EDGE_INTERNAL_API_KEY must be set}
+      # Comma-separated M2M keys; empty list keeps M2M closed
+      DIDVC_EDGE_M2M_API_KEYS: ${DIDVC_EDGE_M2M_API_KEYS:-}
+      DIDVC_EDGE_REDIRECT_URI_ALLOWLIST: ${DIDVC_EDGE_REDIRECT_URI_ALLOWLIST:-}
+      DIDVC_EDGE_WALLET_ENDPOINT_ALLOWLIST: ${DIDVC_EDGE_WALLET_ENDPOINT_ALLOWLIST:-}
+    ports:
+      - "8090:8080"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
     networks:
       - aml-network
 

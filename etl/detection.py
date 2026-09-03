@@ -31,7 +31,7 @@ import json
 import psycopg2
 from dagster import op, job, schedule, RunRequest, DefaultScheduleStatus
 
-POSTGRES_URI = os.getenv("POSTGRES_URI", "postgresql://postgres:password@age_db:5432/age_prod_01")
+POSTGRES_URI = os.getenv("POSTGRES_URI", "")  # required from the environment — no literal fallback
 RULE_VERSION = "2026.07-tap-and-go-detection-2"
 
 # tap_and_go-native scenarios. Thresholds are HKD (tap_and_go is a HK fiat rail).
@@ -122,11 +122,11 @@ SCENARIOS = [
 
 
 def get_db_connection():
-    try:
-        return psycopg2.connect(POSTGRES_URI)
-    except psycopg2.OperationalError:
-        # Fallback for local dev (host-mapped port 5433, matching daily_pipeline.py)
-        return psycopg2.connect("postgresql://postgres:password@localhost:5433/age_prod_01")
+    # DSN (including credentials) comes exclusively from the environment —
+    # no in-code fallback (TASK-001: no hardcoded secrets).
+    if not POSTGRES_URI:
+        raise Failure("POSTGRES_URI environment variable is required")
+    return psycopg2.connect(POSTGRES_URI)
 
 
 @op

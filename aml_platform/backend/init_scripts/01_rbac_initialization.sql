@@ -1,19 +1,9 @@
 -- 01_rbac_initialization.sql
+-- Roles (aml_api_role, aml_etl_role, keycloak) are created by
+-- 00-roles-from-env.sh with passwords sourced from the environment — no
+-- credential literals live in SQL (TASK-001).
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- 1. Create limited roles
-DO
-$$
-BEGIN
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'aml_api_role') THEN
-      CREATE ROLE aml_api_role WITH LOGIN PASSWORD 'aml_secure_api_password' NOBYPASSRLS;
-   END IF;
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'aml_etl_role') THEN
-      CREATE ROLE aml_etl_role WITH LOGIN PASSWORD 'aml_secure_etl_password' BYPASSRLS;
-   END IF;
-END
-$$;
 
 GRANT ALL PRIVILEGES ON DATABASE age_prod_01 TO aml_api_role;
 GRANT ALL PRIVILEGES ON DATABASE age_prod_01 TO aml_etl_role;

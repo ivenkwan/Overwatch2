@@ -13,7 +13,7 @@ DB_CONFIG = {
     "port": 5432,
     "database": "aml_platform",
     "user": "aml_admin",
-    "password": os.getenv("DB_PASSWORD", "aml_secure_api_password")
+    "password": os.environ["DB_PASSWORD"]
 }
 
 def run_command(command, description):

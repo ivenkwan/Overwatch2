@@ -272,7 +272,9 @@ class VciAuthorizationCodeFlowTest {
         header.put("jwk", publicJwk.toJSONObject());
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("iss", "hkt-didvc-wallet");
-        payload.put("aud", "http://localhost:8081/hkt");
+        // F-8: the proof audience must be the advertised credential issuer
+        // (issuerBaseUrl + "/" + tenant — see the issuer metadata endpoint).
+        payload.put("aud", "http://localhost:8080/hkt");
         payload.put("iat", System.currentTimeMillis() / 1000);
         payload.put("nonce", cNonce);
         String headerB64 = java.util.Base64.getUrlEncoder().withoutPadding()

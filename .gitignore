@@ -13,6 +13,11 @@
 .vscode/
 .idea/
 
+# Local agent/security-scanner tool state (not project content)
+.mimosa/
+.video_agent/
+.zcode/
+
 # Dependencies
 .venv/
 venv/

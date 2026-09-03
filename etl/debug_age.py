@@ -2,7 +2,7 @@ import psycopg2
 import os
 import traceback
 
-POSTGRES_URI = os.getenv("POSTGRES_URI", "postgresql://postgres:password@age_db:5432/age_prod_01")
+POSTGRES_URI = os.getenv("POSTGRES_URI", "")  # required from the environment — no literal fallback
 try:
     conn = psycopg2.connect(POSTGRES_URI)
     cursor = conn.cursor()

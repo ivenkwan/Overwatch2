@@ -268,6 +268,16 @@ public class VerificationController {
                                                  @RequestParam(value = "vct", required = false) String vct,
                                                  @RequestParam(value = "response_uri", required = false) String responseUri,
                                                  @RequestParam(value = "use_request_uri", required = false) String useRequestUri) {
+        // F-12 hardening: browser redirects only go to wallet endpoints on
+        // the configured allowlist (exact match). An empty allowlist keeps
+        // the demo behaviour — production must configure it.
+        if (!org.apache.unomi.didvc.edge.security.RedirectGuard.allowlistUnconfigured(
+                properties.getWalletEndpointAllowlist())
+                && !org.apache.unomi.didvc.edge.security.RedirectGuard.uriAllowed(
+                        walletEndpoint, properties.getWalletEndpointAllowlist())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "wallet_authorization_endpoint is not allowed for this tenant");
+        }
         String nonce = UUID.randomUUID().toString();
         String requestId = UUID.randomUUID().toString();
         String effectiveResponseUri = responseUri != null ? responseUri

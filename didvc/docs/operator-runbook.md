@@ -314,4 +314,74 @@ before resuming billing.
 
 ---
 
+## Production profile: store swaps and mTLS (AWI TASK-054 / TASK-055, 2026-09-03)
+
+`application-prod.yml` is the production profile. Deploy with
+`--spring.profiles.active=prod` (**never** together with `demo` — F-13).
+
+**Store swaps (F-10 hardening + durability):**
+
+- **Nonce store → Redis**: `didvc.edge.redis-enabled=true` +
+  `spring.data.redis.*` (`DIDVC_REDIS_HOST/PORT/PASSWORD`). Replay
+  protection then survives restarts and works across replicas. Redis must
+  require AUTH and be reachable only from the edge network.
+- **Audit store → JDBC**: the `didvc-metering` audit store persists the
+  hash-chained log to PostgreSQL `didvc_audit_log` (see the metering
+  configuration); keep the append-only grants and schedule `verifyChain()`.
+- **Kafka sinks**: metering records and manifest verification results are
+  published to Kafka (`DIDVC_KAFKA_BOOTSTRAP`, topic
+  `didvc-manifest-verification`); broker must run TLS/SASL.
+- Token/code/par stores inside the edge are TTL-bounded `ExpiringMap`s
+  (F-10 fixed) — no in-process accumulation regardless of profile.
+
+**mTLS (TASK-055):**
+
+- The prod profile terminates TLS at the edge with `client-auth: need`;
+  keystore/truststore are vault-mounted PKCS12 files
+  (`DIDVC_TLS_KEYSTORE*`, `DIDVC_TLS_TRUSTSTORE*`). Only the trusted
+  ingress and the AML backend's client certificate may be in the
+  truststore.
+- **Rotation procedure** (quarterly or on compromise): issue the new
+  server certificate → mount alongside the old keystore → switch the
+  `DIDVC_TLS_KEYSTORE` path → restart the edge (graceful shutdown is
+  enabled) → verify `GET /health` through the ingress → retire the old
+  certificate. Client-certificate rotation: add the new client cert to the
+  truststore → deploy the calling service with the new keypair → remove
+  the old cert after the caller's cutover is confirmed in the audit log.
+- API keys (`internal`, `m2m`) rotate independently of certificates:
+  provision the new key (append to the env list) → roll callers → remove
+  the old key. All comparisons are constant-time; verification failures are
+  audited per call.
+
+**Client registries (F-7/F-12, fixed 2026-09-03):**
+
+- `DIDVC_EDGE_REDIRECT_URI_ALLOWLIST` — comma-separated
+  `clientId|redirectUri` exact pairs; **required in production** before the
+  issuer faces the internet.
+- `DIDVC_EDGE_WALLET_ENDPOINT_ALLOWLIST` — comma-separated exact wallet
+  endpoints for the browser redirect; **required** before
+  `GET /{tenant}/vp/authorize` is exposed publicly.
+
+---
+
+## Tenant and trust registration for the AML platform (AWI TASK-033)
+
+The AML platform consumes the edge as tenant `aml` over the M2M API. One-time
+registration against the didvc platform (didvc-rest, ADMIN role):
+
+1. `POST /didvc/trust-entries` — register the first-party (in-group CDP)
+   issuer per vct: `verifierTenantId=aml`, `issuerDid=<issuer>`,
+   `vct=hkt_kyc_v1` (repeat for `hkt_licensed_institution_v1`,
+   `hkt_corporate_v1`, `hkt_wallet_binding_v1`).
+2. Provision `DIDVC_EDGE_M2M_API_KEYS` (vault) and mirror it into the AML
+   backend's `IDENTITY_PROVIDER_API_KEY`.
+3. Verify the wiring: `GET /didvc/trust-check?verifierTenantId=aml&...` →
+   trusted, then `POST /aml/m2m/verify` from the backend with a test
+   credential — the response must carry `{valid, vct}` and the call must
+   appear in the hash-chained audit log.
+4. Trust entries are maker-checker on the admin surface; every change is
+   audited. Review entries quarterly (pre-GA cadence).
+
+---
+
 Review status: pending ops + legal sign-off (T-8.4 acceptance criteria)

@@ -40,7 +40,7 @@ Static scanning flagged seven hardcoded-credential candidates. Triaged:
 | Location | Verdict | Action |
 |---|---|---|
 | `didvc/interop/wallet-roundtrip.ts` (API key) | **Real** — matched the edge launch flag | **Fixed**: reads `DIDVC_INTERNAL_API_KEY` from the environment; README/LOCAL-CONFORMANCE/runbook now generate per-run keys |
-| `didvc/interop/load-test.ts` (API key default) | **Real** — usable default literal | **Fixed**: `EDGE_API_KEY` required, no default |
+| `didvc/interop` load driver (API key default) | **Real** — usable default literal | **Fixed**: `EDGE_API_KEY` required, no default (driver now `load_test.py`) |
 | CI workflow `didvc-conformance.yml` (2× launch flag) | **Real** — matched the interop scripts | **Fixed**: per-run `ci-$(date)-$RANDOM` keys |
 | edge test properties (`didvc.edge.internal-api-key` + headers, 7 occurrences) | **Real** (test literals) | **Fixed**: per-run `@DynamicPropertySource` UUID keys |
 | `samples/login-integration` `X-Unomi-Api-Key` value | **Real** — key-shaped literal | **Fixed**: `window.UNOMI_API_KEY` injected at page render (`@UNOMI_API_KEY@` deploy-time placeholder) |
@@ -64,14 +64,21 @@ samples, tests, workflows or docs.
 
 ## Open findings (triaged)
 
+> **2026-09-03 hardening update (AWI TASK-034)**: F-7, F-8, F-9, F-10 and
+> F-12 are now **fixed in code** with regression tests (240-test suite
+> green). New hardening utilities: `edge/security/RedirectGuard`
+> (exact-match URI/client-registry checks, constant-time key comparison) and
+> `edge/util/ExpiringMap` (TTL-bounded stores with amortized sweeps).
+> F-11 and F-13 remain open.
+
 | # | Severity | Finding | Recommendation |
 |---|---|---|---|
-| F-7 | Medium | `/authorize` and `/par` accept **any `redirect_uri` and `client_id`** — no client registry or allow-list (RFC 6749 §3.1.2.3). Open-redirect/code-interception risk when the edge is internet-facing. | Production deployments must front the issuer with a client-registration layer (didvc-rest admin surface) and enforce exact-match redirect URIs. Demo/conformance profile accepts this by design. Track as pre-GA hardening. |
-| F-8 | Medium | Credential-request proofs: **`aud`/`iss` claims are not validated** (OID4VCI requires `aud` = credential issuer). A proof audience for another issuer is accepted. | Add strict `aud` check once wallet behaviour is confirmed against the conformance suite (kept out of this phase to avoid regressing the 15-module run). Low blast radius when added. |
-| F-9 | Low | Internal API key (`didvc.edge.internal-api-key`) compared with non-constant-time equality; demo external-issuer JWK passed as a property. | Use constant-time compare; feed keys from env/vault only (see operator runbook — never config literals). |
-| F-10 | Low | `accessTokens`, `preAuthCodes`, `parRequests` maps have no eviction — long-running instances accumulate expired entries (unbounded memory). | Add TTL sweeper; not reachable below internal network today. |
+| F-7 (fixed 2026-09-03) | Medium | `/authorize` and `/par` accept **any `redirect_uri` and `client_id`** — no client registry or allow-list (RFC 6749 §3.1.2.3). Open-redirect/code-interception risk when the edge is internet-facing. | **Fixed**: when `didvc.edge.redirect-uri-allowlist` is configured (env-only, entries `clientId\|redirectUri`), both endpoints enforce exact-pair matches (`RedirectGuard.clientRedirectAllowed`); an empty list preserves the demo/conformance behaviour so existing flows are unaffected. Production must configure the allowlist. |
+| F-8 (fixed 2026-09-03) | Medium | Credential-request proofs: **`aud`/`iss` claims are not validated** (OID4VCI requires `aud` = credential issuer). A proof audience for another issuer is accepted. | **Fixed**: `validateProof` now rejects any `aud` that is not the advertised credential issuer (`issuerBaseUrl + "/" + tenantId`, exactly the metadata value). The conformance tests' proofs were corrected to the real issuer audience — their previous `aud` (a different port) demonstrated the vulnerability. |
+| F-9 (fixed 2026-09-03) | Low | Internal API key (`didvc.edge.internal-api-key`) compared with non-constant-time equality; demo external-issuer JWK passed as a property. | **Fixed**: internal-offer key and every M2M key are compared in constant time (`MessageDigest.isEqual`, all keys iterated to avoid early-exit leaks); an unset key keeps endpoints closed. |
+| F-10 (fixed 2026-09-03) | Low | `accessTokens`, `preAuthCodes`, `parRequests` maps have no eviction — long-running instances accumulate expired entries (unbounded memory). | **Fixed**: all token/code/par stores (plus authorization codes) are TTL-bounded `ExpiringMap`s — expired entries never read back and sweeps are amortized on writes. |
 | F-11 | Low | `direct_post` failures return plain-text 400s, not RFC 9449 error JSON (`invalid_vp_token` etc.) — leaks no data but hampers client error handling. | Standardise error bodies. |
-| F-12 | Informational | Verifier `GET /vp/authorize` redirects to a caller-supplied `wallet_authorization_endpoint` (validated only as a URL). As a browser-facing redirect this is an open-redirect vector. | Restrict to configured wallet endpoints per tenant before exposing the endpoint publicly. |
+| F-12 (fixed 2026-09-03) | Informational | Verifier `GET /vp/authorize` redirects to a caller-supplied `wallet_authorization_endpoint` (validated only as a URL). As a browser-facing redirect this is an open-redirect vector. | **Fixed**: when `didvc.edge.wallet-endpoint-allowlist` is configured (env-only), the browser redirect requires an exact-match entry; empty list keeps demo behaviour. |
 | F-13 | Informational | Demo-only trust surfaces (`--spring.profiles.active=demo`, `InMemoryPlatformApi`, `demoIssuerKid`) must never run in production. | Enforce profile allow-list at deployment (runbook checklist). |
 
 ## OWASP API Top-10 (2023) mapping
@@ -81,7 +88,7 @@ samples, tests, workflows or docs.
 - **API3 Broken property-level authorization** — verification responses expose disclosed claims only; pairwise pseudonyms for subjects; profile resolution never leaves the platform.
 - **API4 Unrestricted resource consumption** — load-test results (see `performance.md`) bound per-request cost; F-10 remains.
 - **API5/6** — internal admin API is network-scoped + keyed; no mass-assignment surfaces (DTOs are explicit).
-- **API7 SSRF** — the edge performs no server-side fetches of user-supplied URLs (DID resolution goes through the platform API); the *tooling* (`drive-openid-plan.py`, `load-test.ts`) applies strict origin allowlists with IP-class validation.
+- **API7 SSRF** — the edge performs no server-side fetches of user-supplied URLs (DID resolution goes through the platform API); the *tooling* (`drive-openid-plan.py`, `load_test.py`) applies strict origin allowlists with IP-class validation.
 - **API8 Misconfiguration** — TLS/Redis AUTH/vault guidance in the operator runbook.
 - **API9/10** — inventory: this document plus the runbook; audit log covers issuance/verification/revocation.
 

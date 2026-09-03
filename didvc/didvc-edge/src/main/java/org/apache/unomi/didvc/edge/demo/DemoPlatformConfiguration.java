@@ -41,6 +41,11 @@ public class DemoPlatformConfiguration {
         // Demo trust: the demo verifier tenant accepts the demo issuer's
         // KYC credential, so OID4VP verification succeeds end to end.
         platformApi.trust("bank-a", InMemoryPlatformApi.ISSUER_DID, "hkt_kyc_v1");
+        // AWI TASK-033 (pilot): the AML platform's relying tenant is
+        // registered against the first-party demo issuer, so the M2M seam
+        // accepts its credentials. Production performs this via the
+        // didvc-rest trust-entries admin surface (see the operator runbook).
+        platformApi.trust("aml", InMemoryPlatformApi.ISSUER_DID, "hkt_kyc_v1");
         // Credentials reference the edge's fetchable status-list endpoint
         // (served by CredentialIssuerController) instead of an opaque URN,
         // so wallets can check revocation over HTTP.

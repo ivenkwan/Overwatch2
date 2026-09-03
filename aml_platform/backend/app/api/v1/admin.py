@@ -2,15 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from typing import List, Optional
 from pydantic import BaseModel
 from keycloak import KeycloakAdmin
-import os
 import asyncpg
+from app.core import auth
+from app.core.config import get_settings
 from app.db.session import get_db
-
-# Initialize Keycloak Admin configuration from environment
-KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://host.docker.internal:8080")
-KEYCLOAK_ADMIN_USER = os.environ.get("KEYCLOAK_ADMIN_USER", "admin")
-KEYCLOAK_ADMIN_PASSWORD = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
-KEYCLOAK_REALM_NAME = os.environ.get("KEYCLOAK_REALM_NAME", "master")
+from app.services import audit_service
 
 router = APIRouter()
 
@@ -25,21 +21,30 @@ class RoleAssign(BaseModel):
     role_code: str
 
 def get_keycloak_admin():
+    # Admin credentials come exclusively from the environment (no defaults —
+    # the former admin/admin fallback is removed).
+    settings = get_settings()
+    if not settings.keycloak_admin_user or not settings.keycloak_admin_password:
+        raise HTTPException(
+            status_code=503,
+            detail="Keycloak admin credentials not configured (KEYCLOAK_ADMIN_USER / KEYCLOAK_ADMIN_PASSWORD)",
+        )
     try:
         return KeycloakAdmin(
-            server_url=KEYCLOAK_URL,
-            username=KEYCLOAK_ADMIN_USER,
-            password=KEYCLOAK_ADMIN_PASSWORD,
-            realm_name=KEYCLOAK_REALM_NAME,
+            server_url=settings.keycloak_url + "/",
+            username=settings.keycloak_admin_user,
+            password=settings.keycloak_admin_password,
+            realm_name=settings.keycloak_admin_realm,
             verify=True
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to connect to Keycloak: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to connect to Keycloak")
 
 @router.post("/users", status_code=201)
 async def create_user(
-    new_user: UserCreate, 
+    new_user: UserCreate,
     x_tenant_id: str = Header(..., description="Tenant ID executing the addition"),
+    current_user: dict = Depends(auth.require_role("ADMIN")),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """
@@ -94,6 +99,15 @@ async def create_user(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Database synchronization failed: {str(e)}")
 
+    await audit_service.record_audit_event(
+        "USER_CREATED",
+        actor=current_user,
+        resource_type="USER",
+        resource_id=str(user_record["user_id"]),
+        reason=f"username={new_user.username} tenant={x_tenant_id} keycloak_user={keycloak_user_id}",
+        tenant_id=x_tenant_id,
+        db=conn,
+    )
     return {
         "status": "success",
         "message": "User provisioned and mapped locally.",
@@ -104,6 +118,7 @@ async def create_user(
 @router.get("/users")
 async def get_tenant_users(
     x_tenant_id: str = Header(..., description="Tenant ID executing the request"),
+    current_user: dict = Depends(auth.require_role("ADMIN")),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Get all users mapped to the current tenant."""
@@ -119,7 +134,10 @@ async def get_tenant_users(
     return {"status": "success", "users": [dict(u) for u in users]}
 
 @router.get("/roles")
-async def get_roles(conn: asyncpg.Connection = Depends(get_db)):
+async def get_roles(
+    current_user: dict = Depends(auth.require_role("ADMIN")),
+    conn: asyncpg.Connection = Depends(get_db)
+):
     """Fetch predefined roles that an admin can assign to a user."""
     roles = await conn.fetch("SELECT role_id, role_code, role_name, description FROM app.roles WHERE role_scope = 'tenant';")
     return {"status": "success", "roles": [dict(r) for r in roles]}
@@ -129,6 +147,7 @@ async def assign_role(
     local_user_id: str,
     payload: RoleAssign,
     x_tenant_id: str = Header(..., description="Tenant ID executing the addition"),
+    current_user: dict = Depends(auth.require_role("ADMIN")),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Map a role to a user internally."""
@@ -154,4 +173,12 @@ async def assign_role(
             x_tenant_id, local_user_id, role_id
         )
         
+    await audit_service.record_audit_event(
+        "ROLE_ASSIGNED",
+        actor=current_user,
+        resource_type="USER",
+        resource_id=local_user_id,
+        reason=f"role={payload.role_code} tenant={x_tenant_id}",
+        db=conn,
+    )
     return {"status": "success", "message": f"Role '{payload.role_code}' assigned to user."}

@@ -1,25 +1,33 @@
+"""Generate the OpenAPI schema (docs/openapi.json).
+
+Run from the repository root:
+
+    python aml_platform/backend/generate_openapi.py
+"""
+
 import json
-import os
 import sys
+from pathlib import Path
 
 # Ensure backend root is in python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(str(Path(__file__).resolve().parent))
 
-from app.main import app
+from app.main import app  # noqa: E402
+
+
+def build_schema() -> dict:
+    return app.openapi()
+
 
 def main():
-    openapi_schema = app.openapi()
-    
-    # Resolve the destination directory: docs/ at the root of the workspace
-    # Since generate_openapi.py is in aml_platform/backend, its root is 2 levels up
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    output_dir = os.path.join(root_dir, "docs")
-    os.makedirs(output_dir, exist_ok=True)
-    
-    output_path = os.path.join(output_dir, "openapi.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(openapi_schema, f, indent=2)
-    print(f"Successfully generated OpenAPI schema at {output_path}")
+    openapi_schema = build_schema()
+
+    # Output goes to a FIXED relative path (see module docstring) — the
+    # literal path keeps the write confined, out of reach of any traversal.
+    Path("docs").mkdir(parents=True, exist_ok=True)
+    Path("docs/openapi.json").write_text(json.dumps(openapi_schema, indent=2), encoding="utf-8")
+    print("Successfully generated OpenAPI schema at docs/openapi.json")
+
 
 if __name__ == "__main__":
     main()

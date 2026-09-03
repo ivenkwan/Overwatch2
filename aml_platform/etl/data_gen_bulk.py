@@ -2,24 +2,24 @@ import random
 import uuid
 from datetime import datetime, timedelta
 
-def generate_bulk_data(count=20000):
+def generate_bulk_statements(count=20000):
     sql_statements = []
-    
+
     # 1. Generate Peeling Chains (approx 30% of data)
     for i in range(count // 3):
         chain_id = str(uuid.uuid4())[:8]
         source = f"SOURCE_{chain_id}"
         amount = random.randint(50000, 200000)
-        
+
         # 4-6 hop peel
         for hop in range(random.randint(4, 6)):
             peel_id = f"PEEL_{chain_id}_{hop}"
             change_id = f"CHANGE_{chain_id}_{hop}"
             target_id = f"TARGET_{chain_id}_{hop}"
-            
+
             peel_amt = amount * random.uniform(0.05, 0.25)
             change_amt = amount - peel_amt
-            
+
             # Peel Tx
             sql_statements.append(
                 f"INSERT INTO staging_crypto_raw (tx_hash, sender_wallet, receiver_wallet, asset_id, volume_native, volume_usd, network, transaction_timestamp) "
@@ -40,9 +40,9 @@ def generate_bulk_data(count=20000):
         source = f"SRC_LAYER_{cluster_id}"
         sink = f"SINK_LAYER_{cluster_id}"
         mules = [f"MULE_{cluster_id}_{j}" for j in range(random.randint(3, 8))]
-        
+
         base_amt = random.randint(10000, 550000)
-        
+
         for mule in mules:
             # Fan-out
             sql_statements.append(
@@ -63,8 +63,16 @@ def generate_bulk_data(count=20000):
             f"VALUES ('TX_NOISE_{uuid.uuid4().hex[:10]}', 'WAL_{random.randint(1000, 9999)}', 'WAL_{random.randint(1000, 9999)}', 'ETH', {random.uniform(0.1, 5):.4f}, {random.randint(100, 15000):.2f}, 'ETHEREUM', NOW() - INTERVAL '{random.randint(1, 48)} hours');"
         )
 
-    with open('bulk_synthetic_data.sql', 'w') as f:
-        f.write("\n".join(sql_statements[:count]))
+    return sql_statements[:count]
+
+def generate_bulk_data(count=20000):
+    statements = generate_bulk_statements(count)
+    # Output goes to a FIXED relative path in this script's directory —
+    # the literal path keeps the write confined, out of reach of traversal.
+    from pathlib import Path
+    output = Path(__file__).resolve().parent / "bulk_synthetic_data.sql"
+    output.write_text("\n".join(statements), encoding="utf-8")
+    return len(statements)
 
 import sys
 
@@ -72,5 +80,5 @@ if __name__ == "__main__":
     count = 20000
     if len(sys.argv) > 1:
         count = int(sys.argv[1])
-    generate_bulk_data(count)
-    print(f"Generated {count} rows in bulk_synthetic_data.sql")
+    rows = generate_bulk_data(count)
+    print(f"Generated {rows} rows in bulk_synthetic_data.sql")

@@ -47,11 +47,15 @@ committed literal:
 
 ```bash
 export EDGE_API_KEY="$(openssl rand -hex 24)"   # same key the edge was started with
-cd didvc/interop && npx tsx load-test.ts --edge https://edge.example.hkt --iterations 500 --concurrency 16
+cd didvc/interop && python3 load_test.py --edge https://edge.example.hkt --iterations 500 --concurrency 16
 ```
 
-`load-test.ts` prints the p50/p95/p99 and fails non-zero when the p95
-target (default 1000 ms) is exceeded.
+`load_test.py` (Python port of the original TS driver; httpx + asyncio +
+cryptography) prints the p50/p95/p99 and fails non-zero when the p95
+target (default 1000 ms) is exceeded. Requires `pip install httpx
+cryptography`. The port also fixes a protocol drift from the original TS
+tool: the direct_post state is now the server-issued requestId from the
+authorize response, not the client nonce.
 
 ## Notes and open items
 

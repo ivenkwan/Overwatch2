@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from app.core.exceptions import database_error
 from app.core import auth
 from app.db.session import get_db
 
@@ -34,7 +35,7 @@ async def get_monthly_report(
             "checker_metrics": checker_metrics
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise database_error("reports.monthly", e)
 
 @router.get("/kpis")
 async def get_daily_kpis(
@@ -60,4 +61,4 @@ async def get_daily_kpis(
             
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise database_error("reports.kpis", e)

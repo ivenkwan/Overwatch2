@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import NotFoundError, ValidationAppError, database_error
 import asyncpg
 from typing import List, Dict, Any
 from app.db.session import get_db
 from app.core import auth
-from app.services import flowable_client
+from app.services import audit_service, flowable_client
 
 router = APIRouter()
 
@@ -53,10 +54,17 @@ async def create_case(
         # Update case with workflow instance ID
         update_query = "UPDATE app.cases SET workflow_instance_id = $1 WHERE case_id = $2"
         await db.execute(update_query, instance_id, row["case_id"])
-        
+        await audit_service.record_audit_event(
+            "CASE_CREATED",
+            actor=current_user,
+            resource_type="CASE",
+            resource_id=case_id,
+            reason=f"source_alert={alert_id} workflow={instance_id}",
+            db=db,
+        )
         return {"status": "success", "case_id": case_id, "workflow_instance_id": instance_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise database_error("cases.create", e)
 
 @router.get("/{case_id}")
 async def get_case_detail(
@@ -71,7 +79,7 @@ async def get_case_detail(
     """
     row = await db.fetchrow(query, case_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Case not found")
+        raise NotFoundError("Case not found")
         
     case_info = dict(row)
     case_info["case_id"] = str(case_info["case_id"])
@@ -105,13 +113,13 @@ async def action_case(
     query = "SELECT workflow_instance_id FROM app.cases WHERE case_id = $1"
     row = await db.fetchrow(query, case_id)
     if not row or not row["workflow_instance_id"]:
-        raise HTTPException(status_code=400, detail="Case lacks an active workflow instance")
+        raise ValidationAppError("Case lacks an active workflow instance")
         
     instance_id = row["workflow_instance_id"]
     active_task = await flowable_client.get_active_task(instance_id)
     
     if not active_task:
-        raise HTTPException(status_code=400, detail="No active task found for this case")
+        raise ValidationAppError("No active task found for this case")
         
     task_key = active_task.get("taskDefinitionKey")
     
@@ -130,9 +138,9 @@ async def action_case(
             flowable_vars["approved"] = False
             new_db_status = "open"
         else:
-            raise HTTPException(status_code=400, detail="Invalid action for checkerTask")
+            raise ValidationAppError("Invalid action for checkerTask")
     else:
-        raise HTTPException(status_code=400, detail=f"Invalid action {action_type} for task {task_key}")
+        raise ValidationAppError(f"Invalid action {action_type} for task {task_key}")
         
     # Complete the Flowable Task
     await flowable_client.complete_task(active_task["id"], variables=flowable_vars)
@@ -141,5 +149,13 @@ async def action_case(
     if new_db_status:
         update_query = "UPDATE app.cases SET status = $1 WHERE case_id = $2"
         await db.execute(update_query, new_db_status, case_id)
-        
+
+    await audit_service.record_audit_event(
+        "CASE_ACTION",
+        actor=current_user,
+        resource_type="CASE",
+        resource_id=case_id,
+        reason=f"action={action_type} task={task_key} new_status={new_db_status} notes={notes}",
+        db=db,
+    )
     return {"status": "success", "new_status": new_db_status}

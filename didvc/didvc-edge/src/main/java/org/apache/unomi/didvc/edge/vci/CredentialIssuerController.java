@@ -74,10 +74,16 @@ public class CredentialIssuerController {
     private final org.apache.unomi.didvc.edge.store.NonceStore nonceStore;
     private final DpopProofValidator dpopValidator = new DpopProofValidator();
 
-    private final Map<String, PreAuthContext> preAuthCodes = new ConcurrentHashMap<>();
-    private final Map<String, AuthorizationCodeContext> authorizationCodes = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, String>> parRequests = new ConcurrentHashMap<>();
-    private final Map<String, AccessTokenContext> accessTokens = new ConcurrentHashMap<>();
+    // F-10 hardening: TTL-bounded stores replace the previously unbounded
+    // maps — long-running instances no longer accumulate expired entries.
+    private final org.apache.unomi.didvc.edge.util.ExpiringMap<String, PreAuthContext> preAuthCodes =
+            new org.apache.unomi.didvc.edge.util.ExpiringMap<>(CODE_TTL_MILLIS);
+    private final org.apache.unomi.didvc.edge.util.ExpiringMap<String, AuthorizationCodeContext> authorizationCodes =
+            new org.apache.unomi.didvc.edge.util.ExpiringMap<>(CODE_TTL_MILLIS);
+    private final org.apache.unomi.didvc.edge.util.ExpiringMap<String, Map<String, String>> parRequests =
+            new org.apache.unomi.didvc.edge.util.ExpiringMap<>(90 * 1000L); // matches PAR expires_in
+    private final org.apache.unomi.didvc.edge.util.ExpiringMap<String, AccessTokenContext> accessTokens =
+            new org.apache.unomi.didvc.edge.util.ExpiringMap<>(CODE_TTL_MILLIS);
 
     public CredentialIssuerController(EdgeProperties properties, PlatformApi platformApi, ObjectMapper objectMapper,
                                      org.apache.unomi.didvc.edge.store.NonceStore nonceStore) {
@@ -347,6 +353,17 @@ public class CredentialIssuerController {
         if (params.get("client_id") == null || params.get("redirect_uri") == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "client_id and redirect_uri are required");
         }
+        // F-7 hardening: when a client registry is configured, the
+        // clientId|redirectUri pair must match exactly (RFC 6749 §3.1.2.3).
+        // An empty allowlist preserves the demo/conformance behaviour.
+        if (!org.apache.unomi.didvc.edge.security.RedirectGuard.allowlistUnconfigured(
+                properties.getRedirectUriAllowlist())
+                && !org.apache.unomi.didvc.edge.security.RedirectGuard.clientRedirectAllowed(
+                        params.get("client_id"), params.get("redirect_uri"),
+                        properties.getRedirectUriAllowlist())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "client_id/redirect_uri is not registered for this issuer");
+        }
         String requestUri = "urn:didvc:par:" + UUID.randomUUID();
         parRequests.put(requestUri, new ConcurrentHashMap<>(params));
         Map<String, Object> response = new LinkedHashMap<>();
@@ -399,6 +416,14 @@ public class CredentialIssuerController {
         if (clientId == null || redirectUri == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "client_id and redirect_uri are required");
         }
+        // F-7 hardening (covers both direct and PAR-pushed parameters).
+        if (!org.apache.unomi.didvc.edge.security.RedirectGuard.allowlistUnconfigured(
+                properties.getRedirectUriAllowlist())
+                && !org.apache.unomi.didvc.edge.security.RedirectGuard.clientRedirectAllowed(
+                        clientId, redirectUri, properties.getRedirectUriAllowlist())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "client_id/redirect_uri is not registered for this issuer");
+        }
         if (codeChallenge != null && codeChallengeMethod == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "code_challenge_method is required");
         }
@@ -421,8 +446,10 @@ public class CredentialIssuerController {
     public Map<String, Object> createOffer(@PathVariable("tenantId") String tenantId,
                                            @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
                                            @RequestBody OfferRequest request) {
-        if (properties.getInternalApiKey() != null && !properties.getInternalApiKey().isEmpty()
-                && !properties.getInternalApiKey().equals(apiKey)) {
+        // F-9 hardening: constant-time comparison; an unset key keeps the
+        // endpoint closed rather than open.
+        if (!org.apache.unomi.didvc.edge.security.RedirectGuard.apiKeyMatches(
+                properties.getInternalApiKey(), apiKey)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid internal API key");
         }
         if (request.getSchemaId() == null || request.getSubjectId() == null || request.getKid() == null) {
@@ -765,6 +792,29 @@ public class CredentialIssuerController {
             String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
             JsonNode payload = new ObjectMapper().readTree(payloadJson);
             String nonce = payload.path("nonce").asText(null);
+            // F-8 hardening: OID4VCI proofs are JWTs for this issuer — when
+            // an `aud` claim is present it MUST be the tenant-scoped
+            // credential issuer identifier (issuerBaseUrl + "/" + tenantId,
+            // exactly the value advertised in the issuer metadata). A proof
+            // audience bound to another issuer is now rejected.
+            String expectedAudience = properties.getIssuerBaseUrl() + "/" + tenantId;
+            if (payload.has("aud")) {
+                boolean audienceOk;
+                if (payload.get("aud").isArray()) {
+                    audienceOk = false;
+                    for (JsonNode audValue : payload.get("aud")) {
+                        if (expectedAudience.equals(audValue.asText())) {
+                            audienceOk = true;
+                            break;
+                        }
+                    }
+                } else {
+                    audienceOk = expectedAudience.equals(payload.get("aud").asText());
+                }
+                if (!audienceOk) {
+                    return new String[]{"invalid_proof", "proof aud must be the credential issuer"};
+                }
+            }
             // OID4VCI: when a c_nonce was issued (token response or nonce
             // endpoint) the proof MUST carry it; anything else is
             // invalid_nonce. Checked before the signature so a stale-nonce

@@ -7,8 +7,12 @@ asyncpg>=0.29.0
 requests
 python-dotenv
 PyJWT
+cryptography
 passlib[bcrypt]
 python-multipart
 email-validator
 python-keycloak
 httpx
+eth-keys
+eth-utils
+eth-hash[pycryptodome]

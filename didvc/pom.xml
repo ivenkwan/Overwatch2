@@ -28,4 +28,40 @@
     <name>Apache Unomi :: DID-VC :: Root</name>
     <description>DID/VC identity and verifiable-credential module for the Apache Unomi Context Server (HKT Trusted-Identity CDP)</description>
     <packaging>pom</packaging>
+
+    <!--
+      Standalone build support (TASK-031): the parent (unomi-root) resolves
+      from the repository root pom.xml (the ASF-published 3.1.0-SNAPSHOT
+      parent), and org.apache.unomi SNAPSHOT dependencies resolve from the
+      Apache snapshot repository. Build with:  mvn -f didvc/pom.xml test
+    -->
+    <modules>
+        <module>didvc-api</module>
+        <module>didvc-sd-jwt</module>
+        <module>didvc-services</module>
+        <module>didvc-metering</module>
+        <module>didvc-rest</module>
+        <module>didvc-edge</module>
+        <module>didvc-openid-gateway</module>
+    </modules>
+
+    <repositories>
+        <repository>
+            <id>apache-snapshots</id>
+            <name>Apache SNAPSHOT Repository</name>
+            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>apache-snapshots</id>
+            <name>Apache SNAPSHOT Repository</name>
+            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 </project>

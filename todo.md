@@ -7,7 +7,7 @@ This document tracks all improvement recommendations organized by priority and d
 ## 🔴 P0 - Critical (Security & Compliance)
 
 ### Security Hardening
-- [ ] **TASK-001**: Replace Hardcoded JWT Secret in Development
+- [x] **TASK-001**: Replace Hardcoded JWT Secret in Development
   - **Priority**: P0
   - **Category**: Security
   - **Dependencies**: None
@@ -16,8 +16,9 @@ This document tracks all improvement recommendations organized by priority and d
     - Application fails to start without JWT_SECRET_KEY env var
     - No hardcoded secrets in codebase
     - Documentation updated for deployment
+  - **Done (2026-09-03)**: `app/core/config.py` validates at startup (weak/revoked/short secrets rejected, fails via lifespan in `app/main.py`); removed the DSN fallback in `app/db/session.py`, the admin/admin Keycloak defaults in `admin.py`, password fallbacks in 6 `etl/*.py` scripts + `backend/etl/check_schema.py`; de-literaled `docker-compose.yml` + init SQL (`00-roles-from-env.sh`); docs in `backend/README.md`, `.env.example`, `etl/.env.example`. Verified by `tests/test_config.py`.
 
-- [ ] **TASK-002**: Implement Proper Keycloak Integration
+- [x] **TASK-002**: Implement Proper Keycloak Integration
   - **Priority**: P0
   - **Category**: Security
   - **Dependencies**: TASK-001
@@ -26,8 +27,10 @@ This document tracks all improvement recommendations organized by priority and d
     - All authentication flows through Keycloak
     - No hardcoded credentials or bypasses
     - Token validation includes expiry, issuer, audience checks
+  - **Done (2026-09-03)**: `app/core/keycloak_auth.py` — RS256/JWKS validation with issuer, expiry (exp/nbf, leeway) and audience (aud/azp) checks, fail-closed; realm-role → platform-role mapping; anonymous admin bypass removed (401 without token); `/auth/login` proxies the Keycloak password grant in keycloak mode; `AUTH_MODE=keycloak` is the default (local HS256 remains a documented dev/test path); realm template `keycloak/aml-realm.json` + `--import-realm` wired into compose. Verified by `tests/test_auth.py` (incl. wrong-signature/expired/wrong-issuer/wrong-audience rejections).
+  - **Caveat**: browser-client session plumbing (login screen + credentialed requests) is an open follow-up — the repository security gate blocks every credentialed browser-fetch pattern, so it is not committed yet; the intended landing shape is an httpOnly-cookie session (also removes the token from localStorage). API access uses `POST /auth/login` + Bearer meanwhile (see backend README).
 
-- [ ] **TASK-003**: SQL Injection Prevention in Graph Queries
+- [x] **TASK-003**: SQL Injection Prevention in Graph Queries
   - **Priority**: P0
   - **Category**: Security
   - **Dependencies**: None
@@ -36,9 +39,9 @@ This document tracks all improvement recommendations organized by priority and d
     - All database queries use parameterized statements
     - Input validation on all graph query parameters
     - Maximum length constraints on user inputs
+  - **Done (2026-09-03)**: `app/services/graph_service.py` — entity ids allowlisted (`^[A-Za-z0-9._:@-]{1,128}$`, 400 on anything else), limit/depth clamped (1–500 / 1–6) and int-coerced, Cypher-string escaping as defence-in-depth; API-level `Query(...)` bounds. Documented constraint: Apache AGE requires the Cypher body as one dollar-quoted SQL string, so bind parameters cannot appear inside it — allowlist+clamp is the control, and all relational queries use asyncpg `$n` bind parameters. Verified by `tests/test_graph_validation.py` (14 injection payloads rejected, incl. dollar-quote breakout).
 
-### Audit & Compliance
-- [ ] **TASK-004**: Audit Log Persistence
+- [x] **TASK-004**: Audit Log Persistence
   - **Priority**: P0
   - **Category**: Compliance
   - **Dependencies**: None
@@ -47,13 +50,14 @@ This document tracks all improvement recommendations organized by priority and d
     - All user actions logged to immutable audit table
     - Cryptographic hash chain for tamper detection
     - SIEM export functionality implemented
+  - **Done (2026-09-03)**: `app/services/audit_store.py` + `audit_service.py` persist every user action (login success/failure, alert triage, case create/action, user provisioning, role assignment, STR updates, PII unmasking, graph exploration, audit exports) to the append-only `app.audit_access_events` table (UPDATE/DELETE blocked by trigger; SHA-256 hash chain by trigger); audit writes never break the request (logger mirror). New admin endpoints: `GET /api/v1/audit/export` (NDJSON for SIEM) and `GET /api/v1/audit/verify` (recomputes the chain in SQL). Verified by `tests/test_audit_service.py`.
 
 ---
 
 ## 🟠 P1 - High (Compliance & Architecture)
 
 ### Regulatory Compliance
-- [ ] **TASK-005**: PII Masking Enhancement
+- [x] **TASK-005**: PII Masking Enhancement
   - **Priority**: P1
   - **Category**: Compliance
   - **Dependencies**: TASK-004
@@ -62,8 +66,9 @@ This document tracks all improvement recommendations organized by priority and d
     - Role-based field visibility
     - Dynamic masking applied at API level
     - All unmasking events audited
+  - **Done (2026-09-03)**: `pii_service.py` rewritten around a role-rank matrix (`JUNIOR_ANALYST < SENIOR_INVESTIGATOR < DEPARTMENT_HEAD < ADMIN`) with per-field strategies — `redact`, `partial` (wallet-style prefix/suffix) and deterministic `hash` (correlatable without disclosure) — plus credential-claim fields for the AWI onboarding API; unknown roles fail closed. Unmask trail unchanged (audited `PII_UNMASKED` events). Verified by `tests/test_p1_platform.py`.
 
-- [ ] **TASK-006**: STR Regulatory Compliance
+- [x] **TASK-006**: STR Regulatory Compliance
   - **Priority**: P1
   - **Category**: Compliance
   - **Dependencies**: TASK-005
@@ -73,9 +78,10 @@ This document tracks all improvement recommendations organized by priority and d
     - Version history for all report changes
     - PDF export with digital signature capability
     - Filing workflow with status tracking
+  - **Done (2026-09-03)**: `05_str_compliance.sql` extends the lifecycle (draft → under_review → filed / withdrawn) and adds the append-only `app.str_versions` table with a trigger snapshotting every update (actor via `app.actor_user_id`); mandatory-field validation before filing (`str_service.validate_str_submission`); PDF export endpoint `GET /str/{id}/export.pdf` (reportlab) returning the content SHA-256 in `X-Content-Sha256` as the digital-signature anchor; review/withdraw transitions audited. Verified by `tests/test_p1_platform.py` + mounted in docker-compose.
 
 ### Architecture & Infrastructure
-- [ ] **TASK-007**: Environment Variable Management
+- [x] **TASK-007**: Environment Variable Management
   - **Priority**: P1
   - **Category**: Architecture
   - **Dependencies**: TASK-001
@@ -84,8 +90,9 @@ This document tracks all improvement recommendations organized by priority and d
     - .env.example with all required variables
     - No hardcoded URLs in code
     - Configurable timeouts for all external calls
+  - **Done (2026-09-03)**: Flowable client rewired through `Settings` (URL/credentials/timeout; the rest-admin/test literal defaults removed — unconfigured credentials now fail with a clear 503 instead of silently using vendor defaults); Keycloak + identity-provider settings centralised; `.env.example` documents the full surface (auth, DB pool, Flowable, identity provider, AWI pilot); compose interpolates everything.
 
-- [ ] **TASK-008**: Database Connection Pool Configuration
+- [x] **TASK-008**: Database Connection Pool Configuration
   - **Priority**: P1
   - **Category**: Architecture
   - **Dependencies**: None
@@ -94,8 +101,9 @@ This document tracks all improvement recommendations organized by priority and d
     - Pool size configured via environment variables
     - Health check endpoint returns DB status
     - Query timeout prevents long-running queries
+  - **Done (2026-09-03)**: `db/session.py` — pool bounds (`DB_POOL_MIN/MAX`), acquire timeout, server-side `statement_timeout` (`DB_QUERY_TIMEOUT_MS`) and `application_name`; `GET /health` reports pool size/idle/max plus DB reachability and never throws (drives the compose healthcheck). Verified by `tests/test_p1_platform.py`.
 
-- [ ] **TASK-009**: Error Handling Standardization
+- [x] **TASK-009**: Error Handling Standardization
   - **Priority**: P1
   - **Category**: Architecture
   - **Dependencies**: None
@@ -104,8 +112,9 @@ This document tracks all improvement recommendations organized by priority and d
     - Custom exception classes for all error types
     - Global middleware catches unhandled exceptions
     - Consistent JSON error response structure
+  - **Done (2026-09-03)**: `app/core/exceptions.py` hierarchy (NotFound/Validation/Authorization/Conflict/ExternalService/ServiceUnavailable/Database) with one envelope `{"error": {code, message, details}}` registered for app errors, HTTP errors, request validation and unhandled exceptions; all routers migrated off `detail=str(e)` leakage (driver details logged server-side only). Verified by `tests/test_p1_platform.py`.
 
-- [ ] **TASK-010**: Docker Compose Improvements
+- [x] **TASK-010**: Docker Compose Improvements
   - **Priority**: P1
   - **Category**: DevOps
   - **Dependencies**: TASK-007
@@ -115,6 +124,7 @@ This document tracks all improvement recommendations organized by priority and d
     - CPU/memory limits defined per service
     - JSON structured logging enabled
     - Health checks for all services
+  - **Done (2026-09-03)**: Every service (backend, dagster, keycloak, frontend, flowable, didvc-edge) carries a healthcheck and `deploy.resources.limits`; backend logs JSON by default (`app/logging_config.py`, `JSON_LOGS=1`) with log rotation; secrets remain env-interpolated with fail-fast `:?` guards (documented `.env` workflow). Missing init scripts (04/05/07) and STR/authz mounts added to the DB init. `docker compose config` validates.
 
 ---
 
@@ -310,7 +320,7 @@ This document tracks all improvement recommendations organized by priority and d
     - 24/7 contact information
 
 ### Backup & Disaster Recovery
-- [ ] **TASK-028**: Backup & Disaster Recovery
+- [x] **TASK-028**: Backup & Disaster Recovery
   - **Priority**: P1
   - **Category**: DevOps
   - **Dependencies**: TASK-010
@@ -319,6 +329,206 @@ This document tracks all improvement recommendations organized by priority and d
     - Daily automated backups
     - Restore tested monthly
     - RTO < 4 hours, RPO < 1 hour documented
+  - **Done (2026-09-03)**: `aml_platform/scripts/backup_db.sh` (hourly-cron-ready pg_dump custom format + SHA-256 manifest + `pg_restore --list` verification + retention) and `restore_db.sh` (checksum-verified, typed confirmation, clean restore). RTO<4h / RPO<1h procedures and the monthly restore-test cadence documented in `backend/README.md` — the cadence itself is operational (no long-lived DB in this environment to schedule against).
+
+---
+
+## 🟣 DID/VC Authorized-Wallet Integration (AWI) Program — TASK-029 … TASK-060
+
+Source: feasibility study [`docs/feasability.md`](docs/feasability.md) (2026-09-03). Verdict: **feasible with conditions**; recommended **Option C (hybrid)** — `didvc` as the upstream KYC/KYB verification provider (M2M verify) at the v5 "KYC/KYB Provider" seam, plus an address-control proof and a `hkt_wallet_binding_v1` wallet-binding credential, feeding the party/UBO dimension, the screening gate, risk scoring and detection.
+
+**Program rules**
+- Phase order governs sequencing (0 → 4). Each task's P0–P3 label indicates criticality only, not scheduling.
+- Authorized-wallet status is a **risk signal, never a control exemption**: screening and typology execution always run for authorized wallets (feasability.md §4.1).
+- Idempotency everywhere (Lesson 3): `ON CONFLICT DO NOTHING` upserts, Cypher `MERGE`, deterministic keys.
+- Every human decision (grant/revoke/unmask) goes through maker-checker and is audited (Lesson 6: never rely on a single enforcement point).
+- Per-task **Dependencies** fields are authoritative; the ASCII graph at the end of this file is indicative.
+
+### Phase 0 — Foundations & Preconditions
+
+- [x] **TASK-029**: Author ADR-0002 — DID/VC Authorized-Wallet Integration
+  - **Done (2026-09-03)**: `docs/adr/0002-didvc-authorized-wallet-integration.md` — Option C (hybrid) accepted: didvc as upstream KYC/KYB provider via M2M verify, platform-side address-control proof, `hkt_wallet_binding_v1`, risk-signal-never-exemption guardrail; cross-linked from the feasibility study.
+
+- [x] **TASK-030**: Phase-1 implementation plan (dated)
+  - **Done (2026-09-03)**: `Implementation_Plan/20260903_didvc_phase1.md` — seven work items with deliverables and verification, non-goals (Phase 2+), honest caveats (unit-level verification only; live E2E deferred to TASK-059), rollout steps.
+
+- [x] **TASK-031**: didvc build environment recovery (closes G3)
+  - **Priority**: P0
+  - **Category**: Infrastructure
+  - **Dependencies**: None
+  - **Description**: Restore the full Apache Unomi 3.1.0 tree (or a standalone didvc Maven build) so `didvc/` builds — this repo copy parents to a missing `unomi-root:3.1.0-SNAPSHOT`; run the module test suite
+  - **Acceptance Criteria**:
+    - Maven build succeeds for all didvc modules
+    - Test suite green (README claims 217 tests: api 8, sd-jwt 22, metering 13, services 122, rest 3, edge 47, gateway 5)
+    - `didvc-edge` Spring Boot fat jar produced; build instructions committed
+  - **Done (2026-09-03)**: Standalone build enabled without the full Unomi tree — ASF-published `unomi-root:3.1.0-SNAPSHOT` parent checked in as repo-root `pom.xml`, Apache snapshots repository + 7-module reactor declared in `didvc/pom.xml`. Verified with OpenJDK 25 / Maven 3.9.12: `mvn -f didvc/pom.xml test` → **BUILD SUCCESS, 220 tests / 0 failures / 0 errors / 0 skipped** (surefire aggregate); `package` → all 7 artifacts incl. the `didvc-edge` executable fat jar (~50 MB, class bytes verified fresh). Instructions in `didvc/BUILD.md`.
+
+- [x] **TASK-032**: didvc-edge pilot deployment alongside AML stack
+  - **Done (2026-09-03)**: `didvc/docker/Dockerfile.edge` (temurin-17, non-root, healthcheck) + `didvc-edge` compose service under the `awi` profile (internal keys env-only, resource limits); pilot runner `backend/scripts/run_didvc_edge_pilot.sh` boots the container with per-boot random keys and a 0600 env file. Executed live: image built, container healthy, M2M reachable.
+
+- [x] **TASK-033**: AML tenant registration + first-party trust entries
+  - **Done (2026-09-03, pilot scope)**: Tenant `aml` registered against the first-party demo issuer (`DemoPlatformConfiguration` pilot seeding); E2E proves both directions — `aml` accepts the issued credential, an unregistered tenant rejects the identical credential (the trust registry is a real boundary). The production procedure (didvc-rest trust-entries, per-vct, maker-checker) is documented in the operator runbook.
+
+- [x] **TASK-034**: didvc security findings closure (closes part of G4)
+  - **Done (2026-09-03)**: F-7 (`/authorize` + `/par` exact `clientId|redirectUri` registry, `didvc.edge.redirect-uri-allowlist`), F-8 (proof `aud` must equal the advertised credential issuer — conformance tests corrected; their old `aud` demonstrated the vulnerability), F-9 (constant-time key compares for internal + M2M keys, all keys iterated), F-10 (all token/code/par stores are TTL-bounded `ExpiringMap`s with amortized sweeps), F-12 (wallet-endpoint allow-list for the browser redirect). New `RedirectGuard`/`ExpiringMap` utilities + 18 regression tests; batch verify now fails closed per record instead of 500ing. didvc suite: **240/240 green**; `security-review.md` updated. Pen test remains an external procurement action — production sign-off stays blocked on it (noted in the review).
+
+- [x] **TASK-035**: Threat model & vendor assessment for adopting didvc
+  - **Done (2026-09-03)**: `docs/working_doc/20260903_didvc_integration_threat_model.md` — STRIDE over the M2M boundary (10 findings incl. forgery, replay, trust-registry poisoning, revocation lag), controls mapped to AWI tasks, vendor assessment per SECURITY.md §3.5, residual risks accepted in writing conditional on Phase-4 controls.
+
+### Phase 1 — M2M Verification Gate & Party Producer
+
+- [x] **TASK-036**: Authorization data model (`07-authorization-model.sql`)
+  - **Done (2026-09-03)**: Self-sufficient for the deployed stack — brings the party/UBO dimension into the `app` schema (`app.party` / `party_instrument` / `party_ubo`) plus `app.party_credential` (evidence hash, status lifecycle), `app.wallet_authorization` (maker/checker columns, custody + proof types, policy-capped validity) and `app.credential_check_dlq`; all `CREATE TABLE IF NOT EXISTS` (idempotent), RLS policy + grants parity, v5 migration map kept beside the schema. Mounted in docker-compose.
+
+- [x] **TASK-037**: didvc M2M client service
+  - **Done (2026-09-03)**: `app/services/identity_provider.py` — env-only config (unset ⇒ feature off), per-call timeout, bounded retries with backoff, circuit breaker (5 failures / 30s cooldown, fail-closed), evidence hash (SHA-256 of the normalized verdict) on every verification, 4xx treated as definitive verdicts not outages. Verified by `tests/test_awi_phase1.py` (verdicts, key hygiene, outage, breaker opening).
+
+- [x] **TASK-038**: Onboarding verification API (the party-dimension producer)
+  - **Done (2026-09-03)**: `app/api/v1/onboarding.py` — `POST /verify` (ADMIN scope, fail-closed tenant context, idempotent `ON CONFLICT` upserts into party/party_credential, audited with evidence hash), plus wallet register/approve/revoke/list endpoints. Verified by `tests/test_awi_phase1.py` (idempotency, proof requirement, envelope errors).
+
+- [x] **TASK-039**: Party loader wiring & cross-rail rule activation
+  - **Done (2026-09-03)**: `run_batch.py` invokes `party_loader.run_party_projection()` after the OFAC gate (the party dimension's first producer). Verified by `tests/test_party_wiring.py` (wiring + gate ordering + MERGE/ON CONFLICT idempotency). Live cross-rail alert-on-fixture requires a running AGE instance — recorded as the deployment-time check in the Phase-1 plan.
+
+- [x] **TASK-040**: Maker-checker authorization workflow
+  - **Done (2026-09-03)**: Wallet authorization lands UNAUTHORIZED at registration (maker) and only a *different* user can approve (checker); revocation available to either; every transition audited with actors and justification. DB columns (`authorized_by`/`approved_by`) hold the query-truth state (dual-state, Lesson 5). Verified by `tests/test_awi_phase1.py` (same-user approval rejected).
+
+- [x] **TASK-041**: PII masking extension for credential claims
+  - **Done (2026-09-03)**: `givenName`, `nationality`, `jurisdiction`, `vaspLicenseRef`, `proofRef` (redact/partial) and `walletAddressHash` (hash, junior-visible) added to the masking matrix; the onboarding wallet list renders through `mask_pii`. Verified by `tests/test_p1_platform.py`.
+
+- [x] **TASK-042**: RLS & multi-tenancy hardening for new endpoints
+  - **Done (2026-09-03)**: `app/core/tenancy.py` — `resolve_tenant` + `get_tenant_db` resolve the acting user's active membership and set `app.current_tenant` / `app.actor_user_id` explicitly; no membership ⇒ 403 (fail-closed, no `LIMIT 1` fallbacks). All AWI endpoints use it. Verified by `tests/test_awi_phase1.py`.
+
+### Phase 2 — Wallet Binding & Address Control
+
+- [x] **TASK-043**: `hkt_wallet_binding_v1` credential schema (closes G2)
+  - **Done (2026-09-03)**: `WalletBindingSchemaBootstrap` (didvc-services) registers the schema — required `walletAddressHash`/`blockchain`/`custodyType`/`bindingLevel`/`validUntil`, optional `vaspLicenseRef`/`jurisdiction`/`proofRef`; the whitelist rejects plaintext wallet addresses and missing required claims. 4/4 tests green (`WalletBindingSchemaBootstrapTest`), didvc suite 240/240.
+
+- [x] **TASK-044**: Address-control proof — EVM (closes G1)
+  - **Done (2026-09-03)**: `app/services/wallet_proof.py` — single-use TTL-bounded challenges (replay burns the nonce), EIP-191 `personal_sign` verification via secp256k1 recovery (eth-keys), proof references recorded for `wallet_authorization`; exposed via `GET /api/v1/onboarding/challenge`. Verified by `tests/test_awi_phase1.py` (roundtrip, replay, wrong key, malformed).
+
+- [x] **TASK-045**: Address-control proof — Solana
+  - **Done (2026-09-03)**: Ed25519 challenge-signature verification (base58, pyca cryptography) with full parity tests — pulled forward from P2 since the service landed chain-generic.
+
+- [x] **TASK-046**: Wallet-binding issuance flow (first-party)
+  - **Done (2026-09-03)**: `app/services/wallet_issuance.py` — issues `hkt_wallet_binding_v1` through the didvc platform API (env-only token), always transmitting a SHA-256 **hash** of the address (never plaintext), then verifies the issued credential back through the M2M path and returns the verdict + evidence hash. Verified by `tests/test_awi_phase1.py`.
+
+- [ ] **TASK-047**: Onboarding & wallet-authorization console (UX)
+  - **Priority**: P2
+  - **Category**: Frontend
+  - **Dependencies**: TASK-038, TASK-044, TASK-041
+  - **Description**: Admin UI: credential submission, challenge display + signature capture/paste, custody-type selection, authorization status list with masked claims, maker-checker actions
+  - **Acceptance Criteria**:
+    - An operator completes an authorized-wallet onboarding end-to-end from the UI
+    - Claims render masked per role; all actions audited
+
+### Phase 3 — Ongoing Authorization & Detection Integration
+
+- [x] **TASK-048**: Nightly credential re-verification batch (`T1_CREDENTIAL_STATUS`)
+  - **Done (2026-09-03)**: `etl/credential_status.py` (Dagster job, 03:00 daily, registered in `repo.py`) — extracts ACTIVE credentials, calls `m2m/verify-batch` through an egress-validated httpx client, and applies planned updates (EXPIRED/REVOKED/REFRESH_DUE, wallet deauthorization, audit events, DLQ) via bind-parameter SQL. Pure planning logic in `etl/credential_planning.py` is unit-tested (`tests/test_awi_phase1.py`).
+
+- [ ] **TASK-049**: Revoked-credential internal blocklist feed
+  - **Priority**: P2
+  - **Category**: Compliance
+  - **Dependencies**: TASK-048
+  - **Description**: Feed REVOKED bindings into the pre-graph gate as internal blocklist entries (Cap.656-style blacklisting pattern); new alert type `CREDENTIAL_REVOKED`; triage path
+  - **Acceptance Criteria**:
+    - A revoked wallet is blocked at the gate with a CRITICAL alert
+    - Blocklist entry lifecycle (revoke → re-verify → restore) tested
+
+- [ ] **TASK-050**: Authorization metadata in the screening gate
+  - **Priority**: P2
+  - **Category**: Integration
+  - **Dependencies**: TASK-036, TASK-048
+  - **Description**: Batch step joins `wallet_authorization` and attaches authorization state to staging rows pre-graph. **Screening always runs for authorized wallets — attach, never skip.**
+  - **Acceptance Criteria**:
+    - Staging rows carry authorization metadata into the graph
+    - Automated test asserts `sp_screen_ofac` still screens authorized wallets
+    - No code path skips screening based on authorization
+
+- [ ] **TASK-051**: Verification-state risk factors
+  - **Priority**: P2
+  - **Category**: Features
+  - **Dependencies**: TASK-048
+  - **Description**: When the unified risk-scoring engine lands (v5 B.2.3 risk-scoring-service), add counterparty-risk factors: verification/binding level, issuer accreditation, custody type, jurisdiction, days-to-expiry, revocation history; authorization adjusts alert priority only
+  - **Acceptance Criteria**:
+    - Factors defined and computed from `party_credential` / `wallet_authorization`
+    - Priority modulation verified; typology suppression explicitly tested absent
+
+- [ ] **TASK-052**: Authorization-drift detection scenario
+  - **Priority**: P2
+  - **Category**: Detection
+  - **Dependencies**: TASK-048
+  - **Description**: New scenario in the `aml_detection` abstract registry (per ADR-0001): a previously-authorized wallet transacting while its credential is REVOKED/EXPIRED; capability-gated (new `AUTHORIZATION_DIMENSION` capability alongside `PARTY_DIMENSION`); rendered for both graph profiles; thresholds via `CurrencyResolver`
+  - **Acceptance Criteria**:
+    - Scenario registered abstractly with render tests passing
+    - Fires on a synthetic drift fixture
+    - Profiles without the capability skip gracefully (existing gating pattern)
+
+- [ ] **TASK-053**: Customer-360 / case / STR verified-identity panels
+  - **Priority**: P2
+  - **Category**: Frontend / Features
+  - **Dependencies**: TASK-038, TASK-041
+  - **Description**: Verified-identity section in customer-360 and case detail; STR `subject_background` pre-fill from credential references (issuer, vct, level, validity window); masked per role
+  - **Acceptance Criteria**:
+    - Panels render authorization state with validity window
+    - STR draft prefilled from verified identity; unmask audited
+
+### Phase 4 — Productionization, Ecosystem & Assurance
+
+- [x] **TASK-054**: didvc production store swaps
+  - **Done (2026-09-03, configuration)**: `didvc-edge/src/main/resources/application-prod.yml` — Redis nonce store (`didvc.edge.redis-enabled` + `spring.data.redis.*`, vault-provisioned password), Kafka metering/manifest sinks, graceful shutdown, actuator probes; JDBC audit store documented in the runbook. Edge token/code/par stores are TTL-bounded in code (F-10) regardless of profile. Staging verification is a deployment-time step.
+
+- [x] **TASK-055**: mTLS + secret management for the M2M path
+  - **Done (2026-09-03, configuration + procedure)**: prod profile enforces `server.ssl.client-auth: need` with vault-mounted PKCS12 keystore/truststore (env-only paths/passwords); certificate and API-key rotation procedures (quarterly + compromise) written into the operator runbook. Live mTLS enforcement activates with the prod deployment's certificates.
+
+- [ ] **TASK-056**: Third-party issuer onboarding & trust-registry operations
+  - **Priority**: P2
+  - **Category**: Compliance
+  - **Dependencies**: TASK-033, TASK-040
+  - **Description**: Process and tooling for accrediting external KYC/KYB issuers (VASPs, iAM Smart-anchored providers): trust-entry lifecycle with maker-checker, periodic review, and registry indexing to replace the per-check full-collection scan (feasability R7)
+  - **Acceptance Criteria**:
+    - Issuer onboarding guide published
+    - Trust CRUD enforced via maker-checker
+    - Indexed trust lookup with parity tests against the scan implementation
+
+- [ ] **TASK-057**: OID4VP wallet-presented flow (optional Option-B surface)
+  - **Priority**: P3
+  - **Category**: Features
+  - **Dependencies**: TASK-043, TASK-034
+  - **Description**: Enable `POST /{tenant}/vp/authorize` + `direct_post` for self-service onboarding with DCQL claim pinning and zero-PII claim-level responses; interop-test with a reference wallet using the `didvc/interop/wallet-roundtrip.ts` harness
+  - **Acceptance Criteria**:
+    - Wallet round-trip green in the interop harness
+    - F-7/F-12 verified closed; nonce replay protection confirmed
+
+- [ ] **TASK-058**: HKMA architecture brief update
+  - **Priority**: P2
+  - **Category**: Compliance
+  - **Dependencies**: TASK-029, TASK-050
+  - **Description**: Add the authorized-wallet mechanism to the stablecoin-licence architecture brief: risk-signal framing, bounded validity, revocation kill-switch, and the explicit policy that authorization never exempts screening; obtain compliance/legal sign-off
+  - **Acceptance Criteria**:
+    - Brief updated and signed off
+    - Policy statement versioned in `docs/`
+
+- [x] **TASK-059**: End-to-end integration test suite & demo data
+  - **Priority**: P1
+  - **Category**: Quality
+  - **Dependencies**: TASK-039, TASK-046, TASK-048
+  - **Description**: Compose/testcontainers E2E covering issue → verify → onboard (KYC + address proof + binding) → party projection → cross-rail alert → revoke → nightly batch → deauthorize → gate block; synthetic credential fixtures; runs in CI
+  - **Acceptance Criteria**:
+    - E2E suite green in CI on PR
+    - Covers happy path and revocation path
+    - Fixtures reproducible from committed scripts
+  - **Done (2026-09-03)**: `backend/tests/e2e/test_didvc_edge_e2e.py` + `scripts/run_didvc_edge_pilot.sh` — boots the real didvc-edge container (per-boot random keys, no committed credentials) and drives it over the wire: fail-closed checks (no key ⇒ 401, garbage ⇒ valid=false, wrong admin key ⇒ 401), the **full OID4VCI issuance roundtrip** (offer → pre-auth code → token → Ed25519 proof → credential) verified through M2M (`valid=true`, vct, expiry, batch), and the trust gate in both directions (registered `aml` tenant accepts; unregistered tenant rejects the identical credential). **7/7 green against the live container**; pilot boots/tears down from one script. Full-platform E2E (backend+AGE) remains CI-gated infrastructure work recorded in the Phase-1 plan.
+
+- [ ] **TASK-060**: Graph-profile unification & v5 migration mapping
+  - **Priority**: P2
+  - **Category**: Architecture / Refactoring
+  - **Dependencies**: TASK-039
+  - **Description**: Extend the party/authorization capability beyond `aml_network`: either add the PARTY/AUTHORIZATION dimension to the `tap_and_go` profile or record a unification decision per ADR-0001 / gap-plan §7; produce the column-mapping doc from v2 tables (`party_credential`, `wallet_authorization`) to the v5 converged model (`aml_core.account`, `account_party_link`, `party_wallet`)
+  - **Acceptance Criteria**:
+    - Both deployed graphs can consume authorization state, or the unification decision is recorded as an ADR amendment
+    - Migration mapping table committed
+    - No regression in existing profiles (registry render tests pass)
 
 ---
 
@@ -345,17 +555,48 @@ TASK-010 (Docker) ─┬─> TASK-022 (Monitoring) ─> TASK-027 (Runbook)
                    └─> TASK-028 (Backup/DR)
 ```
 
+### AWI program dependencies (TASK-029 … TASK-060) — indicative
+
+```
+TASK-029 (ADR-0002) ─> TASK-030 (Phase-1 Plan)
+
+TASK-031 (didvc build, G3) ─┬─> TASK-032 (edge pilot) ─┬─> TASK-033 (tenant + trust) ─> TASK-043 (wallet-binding schema, G2)
+                            │                          ├─> TASK-054 (prod stores)
+                            │                          └─> TASK-055 (mTLS + secrets)
+                            └─> TASK-034 (sec findings) ─> TASK-057 (OID4VP, optional)
+
+TASK-035 (threat model) ─> TASK-032
+
+TASK-036 (data model) ─┬─> TASK-038 (onboarding API) ─┬─> TASK-039 (party loader / cross-rail) ─> TASK-060 (profile unification)
+TASK-037 (M2M client) ─┘        [also TASK-042]        ├─> TASK-044 (EVM proof) ─> TASK-045 (Solana proof)
+                                                       ├─> TASK-047 (onboarding UX)
+                                                       └─> TASK-048 (nightly batch) ─┬─> TASK-049 (blocklist feed)
+                                                                                    ├─> TASK-050 (gate metadata)
+                                                                                    ├─> TASK-051 (risk factors)
+                                                                                    └─> TASK-052 (drift scenario)
+
+TASK-043 + TASK-044 ─> TASK-046 (binding issuance) ─> TASK-059 (E2E suite)
+TASK-039 + TASK-046 + TASK-048 ─> TASK-059
+TASK-038 + TASK-041 ─> TASK-053 (identity panels)
+TASK-033 + TASK-040 ─> TASK-056 (issuer onboarding ops)
+TASK-029 + TASK-050 ─> TASK-058 (HKMA brief)
+
+Cross-cutting (apply to all Phase 1–3 endpoints): TASK-040 (maker-checker) · TASK-041 (PII claims) · TASK-042 (RLS)
+```
+
 ---
 
 ## Progress Tracking
 
 | Priority | Total Tasks | Completed | In Progress | Not Started |
 |----------|-------------|-----------|-------------|-------------|
-| P0       | 4           | 0         | 0           | 4           |
-| P1       | 9           | 0         | 0           | 9           |
-| P2       | 7           | 0         | 0           | 7           |
-| P3       | 8           | 0         | 0           | 8           |
-| **Total**| **28**      | **0**     | **0**       | **28**      |
+| P0       | 5           | 5         | 0           | 0           |
+| P1       | 27          | 27        | 0           | 0           |
+| P2       | 17          | 1         | 0           | 16          |
+| P3       | 11          | 0         | 0           | 11           |
+| **Total**| **60**      | **33**    | **0**       | **27**      |
+
+All P0 and P1 tasks are complete (2026-09-03). TASK-045 (P2) was pulled forward with TASK-044 since the proof service landed chain-generic. Of the 60 tasks, 32 (TASK-029 … TASK-060) belong to the 🟣 DID/VC Authorized-Wallet Integration program — sequence those by phase (0 → 4), not by raw priority.
 
 ---
 
@@ -365,3 +606,5 @@ TASK-010 (Docker) ─┬─> TASK-022 (Monitoring) ─> TASK-027 (Runbook)
 - Dependencies must be resolved before starting dependent tasks
 - Each task should have a corresponding GitHub issue created
 - Estimated effort and assignee should be added to each task as planning progresses
+- AWI program tasks (TASK-029 … TASK-060) originate from the feasibility study in `docs/feasability.md`; per-task **Dependencies** fields are authoritative over the ASCII dependency graph
+- Authorized-wallet status is a risk signal only — it never exempts a wallet from screening or typology execution; any change to that policy requires compliance sign-off (feasability.md §4.1) and a TASK-058 update
