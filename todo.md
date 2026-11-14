@@ -578,6 +578,57 @@ Source: feasibility study [`docs/feasability.md`](docs/feasability.md) (2026-09-
 
 ---
 
+## 🔵 Detection Unification & Workbench Closure — TASK-061 … TASK-068
+
+Source: typology gap plan [`Implementation_Plan/20260710_typology_gap_plan.md`](Implementation_Plan/20260710_typology_gap_plan.md) §7 (unification U0–U4 landed with the live-verified label-union renderer in `025adc2`; U5–U7 open) plus that commit's live-AGE findings. **Recommended as the next build (2026-09-03)**: the unified `aml_detection` engine exists and renders for both graphs, but no production consumer calls it, and its alerts never reach the platform's alert workbench — the detect → triage → case → STR loop is open at the last join.
+
+**Program rules**
+- One scenario registry, two physical graphs (`aml_network`, `tap_and_go_network`) — Option A per ADR-0001; no data migration.
+- Detection output must land in the operational `app.alerts` table (tenant-scoped) so the loop is closed end-to-end.
+- Every rule change is live-verified against the compose Apache AGE instance before it is called done.
+- Authorized-wallet status remains a risk signal, never a control exemption (unchanged from the AWI program).
+
+### Close the loop (this increment)
+
+- [x] **TASK-061**: Unified-engine alert sink into tenant-scoped `app.alerts`
+  - **Priority**: P1
+  - **Category**: Integration
+  - **Dependencies**: None (blocks the value of TASK-063/064)
+  - **Description**: `aml_detection/alerts.py` targets legacy `ag_catalog.alerts` / `core.alerts` shapes only; the deployed backend runs `app.alerts` (`backend/init_scripts/01_rbac_initialization.sql`), which requires `tenant_id` and feeds the alert workbench — the `025adc2` live run had to substitute a scratch table. Extend the AlertSink (or add a profile target) to write `app.alerts` with tenant resolution, preserving column-superset behaviour for the legacy tables.
+  - **Acceptance Criteria**:
+    - Engine alerts insert into `app.alerts` with a valid tenant and surface via the alert-feed API
+    - Legacy sink shapes unchanged; sink tests green for all three targets
+  - **Done (2026-09-03)**: `aml_detection/alerts.py` — the sink now recognises the operational tenant-scoped target (`app.alerts`, detected by table name) and maps the detection row onto it: `alert_type` = scenario name, `status` = 'open' (lowercase per the CHECK), `customer_id` = entity, `risk_score` = severity→25/50/75/90, scenario metadata (code/category/rail/severity/rule_version/entity_id/related_transactions) in the JSONB `payload`, and `payload->>'txn_hash'` = first related tx so the existing triage transitions (`UPDATE … WHERE payload->>'txn_hash'`) act on engine alerts. `tenant_id` is supplied by the deployment wiring through `engine.detect(..., tenant_id=)` — a detection batch has no acting user, and a missing tenant fails loud. AGE agtype quirks normalised (JSON-quoted strings, list-as-text). Security gate (Mimosa): every `execute()` now carries a single literal SQL string with bound values — the sink is a closed set of three fully literal INSERTs (`ag_catalog.alerts`, `core.alerts`, `app.alerts`); unknown tables and schema drift fail loud (the introspection-adaptive column-diff design was replaced by this stricter control). Alert-feed API surfacing (`GET /alerts` still provisional over `core.transactions`) lands with TASK-063. Verified: `test_alerts.py` 8/8, `test_engine.py` 7/7 incl. the tenant-scoped engine path, and the livecheck below.
+
+- [x] **TASK-062**: AGE-crash rewrites for `SCN_PEEL_01` and `SCN_LAYER_RAPID_01`
+  - **Priority**: P1
+  - **Category**: Detection
+  - **Dependencies**: None
+  - **Description**: Live AGE (compose apache/age) crashes the server on variable-length paths carrying `ALL(range(...))` predicates over relationships — an upstream container bug hit by PEELING_CHAIN and RAPID_LAYERING. Rewrite both rules into AGE-surviving equivalents (hoist the predicate out of the path pattern / per-hop formulation) with equivalent semantics.
+  - **Acceptance Criteria**:
+    - All 8 registry scenarios execute against live AGE with zero server crashes
+    - Both rewrites fire on synthetic fixtures (peeling chain; 24h roundtrip ≥3 hops)
+    - Render snapshots updated; label-union expansion still covered
+  - **Done (2026-09-03)**: `registry.py` — `_chain_query`/`_chain_arm` render each rule as a UNION of fixed-depth linear chain arms (3–6 hops) with pairwise conditions between consecutive relationship variables (`t{i+1}` vs `t{i}`); the `ALL(idx IN range(...))` + `relationships(pth)[idx]` construct is gone entirely, and only building blocks already proven green on this AGE instance remain. Semantics preserved per-path (overlapping sub-chains surface as separate alerts, as before); `tx_hashes` now returns the refs list instead of relationship objects. `RULE_VERSION` bumped to `2026.09-aml-detection-workbench`. **Live-verified (compose aml-age-db, age_prod_01)**: full registry 8/8 evaluated, zero rule errors, zero server crashes — PEELING_CHAIN fired 10 (one alert per depth-arm sub-chain on a 6-hop ~0.90-ratio fixture), RAPID_LAYERING fired 3 on a 4-hop/1800s-gap fixture; increasing-value and 7200s-gap negative controls correctly did not fire their rules; 25 alerts sunk to tenant-stamped `app.alerts` and the triage key selected them. Reproducible: `aml_detection/livecheck/` (fixtures → env-connected driver → cleanup). Tests: `test_render.py` 17/17 (crash-construct elimination + rewrite goldens + label-union expansion), legacy suites still 18/18 + 9/9, mypy strict green.
+
+### Finish the unification (gap-plan §7 U5–U7)
+
+- [ ] **TASK-063**: Wire `aml_platform/etl/rule_engine.py` to `aml_detection.engine.detect(AML_NETWORK_PROFILE, conn)` (U5.1); reduce `scenarios.py`/`typologies.py` to back-compat shims.
+- [ ] **TASK-064**: Wire the Dagster `etl/detection.py` op to the shared engine (U5.2) and package `aml_detection/` into the Dagster image (U5.3).
+- [ ] **TASK-065**: Remaining engine tests (U6.4 fake-cursor engine tests, U6.5 profile resolution, U6.6 port/keep the 18 + 9 legacy contract tests against the shims).
+- [ ] **TASK-066**: U7 closeout — deprecation warnings on the legacy engines, migration runbook (incl. the U4.2 `ts` back-fill step), mark gap-plan §6.4 resolved.
+
+### Next value increments (after the loop closes)
+
+- [ ] **TASK-067**: Behavioural baseline tables + HKD threshold windows (gap-plan Phase 2): `customer_behaviour_baseline` / `wallet_behaviour_baseline` / `party.expected_txn_profile` + ETL population; then baseline-relative `SCN_VELOCITY_01`, `SCN_DORMANT_01`, `SCN_PROFILE_MISMATCH_01`, and HKD 120k CTR / 8k Travel-Rule structuring windows via the `CurrencyResolver`.
+- [ ] **TASK-068**: Deferred infra/UX batch: Redis deployment for the query cache, WebSocket KPI push, distributed tracing, case-attachment upload + timeline UI, workflow-failure alerting, WCAG axe audit.
+
+### External (not code; kick off in parallel)
+
+- Pen test for didvc (blocks production sign-off per TASK-034) and MLRO/compliance sign-off on the HKMA brief (TASK-058) — procurement/approval actions, no build work.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -630,6 +681,16 @@ TASK-029 + TASK-050 ─> TASK-058 (HKMA brief)
 Cross-cutting (apply to all Phase 1–3 endpoints): TASK-040 (maker-checker) · TASK-041 (PII claims) · TASK-042 (RLS)
 ```
 
+### Detection-unification dependencies (TASK-061 … TASK-068) — indicative
+
+```
+TASK-061 (app.alerts sink) ─┬─> TASK-063 (rule_engine rewire) ─┐
+TASK-062 (AGE rewrites) ────┘                                  ├─> TASK-066 (U7 closeout)
+TASK-064 (Dagster rewire) ────────────────────────────────────┘
+TASK-065 (engine tests) — authored alongside 063/064
+TASK-067 (baselines + HKD windows) / TASK-068 (infra/UX) — after the loop closes
+```
+
 ---
 
 ## Progress Tracking
@@ -637,12 +698,12 @@ Cross-cutting (apply to all Phase 1–3 endpoints): TASK-040 (maker-checker) · 
 | Priority | Total Tasks | Completed | In Progress | Not Started |
 |----------|-------------|-----------|-------------|-------------|
 | P0       | 5           | 5         | 0           | 0           |
-| P1       | 27          | 27        | 0           | 0           |
-| P2       | 17          | 17        | 0           | 0           |
-| P3       | 11          | 11        | 0           | 0           |
-| **Total**| **60**      | **60**    | **0**       | **0**       |
+| P1       | 31          | 29        | 0           | 2           |
+| P2       | 20          | 17        | 0           | 3           |
+| P3       | 12          | 11        | 0           | 1           |
+| **Total**| **68**      | **62**    | **0**       | **6**       |
 
-All P0 and P1 tasks are complete (2026-09-03). TASK-045 (P2) was pulled forward with TASK-044 since the proof service landed chain-generic. Of the 60 tasks, 32 (TASK-029 … TASK-060) belong to the 🟣 DID/VC Authorized-Wallet Integration program — sequence those by phase (0 → 4), not by raw priority.
+All P0 and P1 tasks are complete (2026-09-03). TASK-045 (P2) was pulled forward with TASK-044 since the proof service landed chain-generic. Of the first 60 tasks, 32 (TASK-029 … TASK-060) belong to the 🟣 DID/VC Authorized-Wallet Integration program — sequence those by phase (0 → 4), not by raw priority. TASK-061 … TASK-068 (🔵 Detection Unification & Workbench Closure) are the recommended next build; TASK-061 + TASK-062 are done — next up: TASK-063 (rewire `rule_engine.py` onto the unified engine) and TASK-064 (Dagster side).
 
 ---
 

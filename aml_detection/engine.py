@@ -30,7 +30,9 @@ from .render import render_statements
 log = logging.getLogger("aml-detection")
 
 #: Bumped whenever the registry shape, a query, or the engine changes.
-RULE_VERSION = "2026.07-aml-detection-engine"
+#: 2026.09 — TASK-061 (operational app.alerts sink) + TASK-062 (AGE-safe
+#: fixed-depth chain rewrites for PEELING_CHAIN / RAPID_LAYERING).
+RULE_VERSION = "2026.09-aml-detection-workbench"
 
 
 def detect(
@@ -40,8 +42,13 @@ def detect(
     resolver: CurrencyResolver = DEFAULT_RESOLVER,
     sink_class: Any = AlertSink,
     logger: Any = log,
+    tenant_id: Any = None,
 ) -> dict[str, Any]:
     """Run every applicable scenario against ``profile``'s graph.
+
+    ``tenant_id`` is required when the profile's alert_table is the
+    tenant-scoped operational table (app.alerts) — the deployment wiring
+    supplies it (there is no acting user in a detection batch).
 
     Returns a summary dict: {profile, evaluated, skipped, fired, errors}.
     """
@@ -50,7 +57,7 @@ def detect(
     try:
         cur.execute("LOAD 'age';")
         cur.execute("SET search_path = ag_catalog, public;")
-        sink = sink_class(profile, cur)
+        sink = sink_class(profile, cur, tenant_id=tenant_id)
         params = resolve_params(profile, resolver)
 
         for scenario in SCENARIOS:

@@ -166,6 +166,55 @@ def test_cross_rail_refuses_tap_and_go():
 
 
 # ---------------------------------------------------------------------------
+# TASK-062: AGE-crash rewrites (PEELING_CHAIN / RAPID_LAYERING). The live AGE
+# server crashed on variable-length paths carrying ALL(range(...)) predicates
+# over relationships(pth); the rewrites render fixed-depth chain arms joined
+# by UNION instead.
+# ---------------------------------------------------------------------------
+
+def test_age_crash_constructs_eliminated():
+    from aml_detection.registry import BY_CODE
+
+    for code in ("SCN_PEEL_01", "SCN_LAYER_RAPID_01"):
+        s = BY_CODE[code]
+        for profile in (AML_NETWORK, TAP_AND_GO):
+            for q in _render_all(s, profile):
+                body = q.split("$$")[1]
+                assert "ALL(" not in body, f"{code}@{profile.name}: ALL(range(...)) survived"
+                assert "relationships(" not in body, f"{code}@{profile.name}: relationships() indexing survived"
+                # variable-length edge patterns ([t:X*3..6]) must be gone:
+                for token in ("Transfer*", "PAID*", "TRANSFERRED*"):
+                    assert token not in body, f"{code}@{profile.name}: variable-length edge {token!r} survived"
+                assert body.count("UNION") == 3, f"{code}@{profile.name}: expected 4 fixed-depth arms (3 UNIONs)"
+                assert "t6." in body or "t6 " in body or "t6," in body, \
+                    f"{code}@{profile.name}: deepest arm (6 hops) missing"
+
+
+def test_peeling_rewrite_pairwise_ratio_conditions():
+    from aml_detection.registry import BY_CODE
+
+    q = _render(BY_CODE["SCN_PEEL_01"], AML_NETWORK)
+    # Depth-3 arm: each hop peels 5-20% off the previous transfer.
+    assert (
+        "MATCH (a:Entity)-[t1:Transfer]->(m1:Entity)-[t2:Transfer]->(m2:Entity)-[t3:Transfer]->(n:Entity)"
+    ) in q
+    assert "WHERE t2.amount_usd < t1.amount_usd * 0.95 AND t2.amount_usd > t1.amount_usd * 0.8" in q
+    assert "AND t3.amount_usd < t2.amount_usd * 0.95 AND t3.amount_usd > t2.amount_usd * 0.8" in q
+    assert "RETURN a.id AS entity_id, [t1.ref_id, t2.ref_id, t3.ref_id] AS tx_hashes" in q
+
+
+def test_rapid_layering_rewrite_pairwise_gap_conditions():
+    from aml_detection.registry import BY_CODE
+
+    q = _render(BY_CODE["SCN_LAYER_RAPID_01"], TAP_AND_GO)
+    assert (
+        "MATCH (a:Customer)-[t1:PAID]->(m1:Customer)-[t2:PAID]->(m2:Customer)-[t3:PAID]->(n:Customer)"
+    ) in q
+    assert "WHERE t2.ts - t1.ts < 3600" in q and "AND t3.ts - t2.ts < 3600" in q
+    assert "RETURN a.id AS entity_id, [t1.txn_hash, t2.txn_hash, t3.txn_hash] AS tx_hashes" in q
+
+
+# ---------------------------------------------------------------------------
 # Golden snapshots — exact locks on the deduped (merged) scenarios, both
 # profiles. Any change to labels/props/structure surfaces here.
 # ---------------------------------------------------------------------------

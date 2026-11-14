@@ -14,7 +14,9 @@ strict = true
 # Legacy bare-generic noise (`def f(p: dict)`) — pervasive in registry
 # builder signatures; the alias Params documents intent instead.
 disable_error_code = ["type-arg"]
-exclude = "(tests?|profiles/test_)"
+# livecheck/ is the live-AGE verification driver (needs a running DB +
+# psycopg2; connection via PG* env vars) — not unit-testable, not typechecked.
+exclude = "(tests?|profiles/test_|livecheck)"
 
 [[tool.mypy.overrides]]
 module = "aml_detection.engine"

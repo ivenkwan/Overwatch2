@@ -96,16 +96,52 @@ def _q_structuring(p: dict) -> str:
     )
 
 
-def _q_peeling(p: dict) -> str:
+def _chain_arm(depth: int, hop_condition: Callable[[int], str]) -> str:
+    """One fixed-depth chain arm: (a)-[t1]->(m1)-...-[t{depth}]->(n) with a
+    pairwise condition between consecutive transfers.
+
+    AGE-SAFETY (TASK-062): variable-length paths carrying
+    ``ALL(idx IN range(...) WHERE relationships(pth)[idx+1] ...)`` predicates
+    crash the Apache AGE server (live finding, 2026-09-03). Chains are
+    therefore rendered as a UNION of fixed-depth arms — plain linear
+    patterns, the same construct the six always-green scenarios use.
+    """
+    pattern = "(a:<<account>>)-[t1:<<transfer>>]->(m1:<<account>>)"
+    for i in range(2, depth):
+        pattern += f"-[t{i}:<<transfer>>]->(m{i}:<<account>>)"
+    pattern += f"-[t{depth}:<<transfer>>]->(n:<<account>>)"
+    conditions = "\n      AND ".join(hop_condition(i) for i in range(1, depth))
+    refs = ", ".join(f"t{i}.<<ref>>" for i in range(1, depth + 1))
+    return (
+        f"    MATCH {pattern}\n"
+        f"    WHERE {conditions}\n"
+        f"    RETURN a.id AS entity_id, [{refs}] AS tx_hashes"
+    )
+
+
+def _chain_query(min_hops: int, max_hops: int, hop_condition: Callable[[int], str]) -> str:
+    arms = "\n    UNION\n".join(
+        _chain_arm(depth, hop_condition) for depth in range(min_hops, max_hops + 1)
+    )
     return (
         "SELECT * FROM cypher('<<graph>>', $$\n"
-        f"    MATCH pth = (a:<<account>>)-[t:<<transfer>>*{p['PEEL_MIN_HOPS']}..{p['PEEL_MAX_HOPS']}]->(n:<<account>>)\n"
-        "    WHERE ALL(idx IN range(0, size(relationships(pth))-2)\n"
-        f"          WHERE (relationships(pth)[idx+1]).<<value>> < (relationships(pth)[idx]).<<value>> * {_fmt(p['PEEL_DEC_MAX'])}\n"
-        f"            AND (relationships(pth)[idx+1]).<<value>> > (relationships(pth)[idx]).<<value>> * {_fmt(p['PEEL_DEC_MIN'])})\n"
-        "    RETURN a.id AS entity_id, relationships(pth)\n"
+        f"{arms}\n"
         "$$) as (entity_id agtype, tx_hashes agtype);\n"
     )
+
+
+def _q_peeling(p: dict) -> str:
+    # Each hop peels 5-20% off the previous transfer's value. Fixed-depth
+    # UNION arms replace the AGE-crashing variable-length + ALL(range(...))
+    # formulation (TASK-062); overlapping sub-chains surface as separate
+    # paths, matching the previous per-path row semantics.
+    def hop(i: int) -> str:
+        return (
+            f"t{i+1}.<<value>> < t{i}.<<value>> * {_fmt(p['PEEL_DEC_MAX'])}"
+            f" AND t{i+1}.<<value>> > t{i}.<<value>> * {_fmt(p['PEEL_DEC_MIN'])}"
+        )
+
+    return _chain_query(p["PEEL_MIN_HOPS"], p["PEEL_MAX_HOPS"], hop)
 
 
 def _q_high_velocity_layering(p: dict) -> str:
@@ -137,14 +173,13 @@ def _q_rapid_movement(p: dict) -> str:
 
 
 def _q_rapid_layering(p: dict) -> str:
-    return (
-        "SELECT * FROM cypher('<<graph>>', $$\n"
-        f"    MATCH pth = (a:<<account>>)-[t:<<transfer>>*{p['RAPID_LAYER_MIN_HOPS']}..{p['RAPID_LAYER_MAX_HOPS']}]->(b:<<account>>)\n"
-        "    WHERE ALL(idx IN range(0, size(relationships(pth))-2)\n"
-        f"          WHERE (relationships(pth)[idx+1]).<<ts>> - (relationships(pth)[idx]).<<ts>> < {_fmt(p['RAPID_LAYER_GAP_S'])})\n"
-        "    RETURN a.id AS entity_id, relationships(pth)\n"
-        "$$) as (entity_id agtype, tx_hashes agtype);\n"
-    )
+    # Consecutive transfers less than RAPID_LAYER_GAP_S apart along a 3-6 hop
+    # chain. Fixed-depth UNION arms replace the AGE-crashing variable-length
+    # + ALL(range(...)) formulation (TASK-062).
+    def hop(i: int) -> str:
+        return f"t{i+1}.<<ts>> - t{i}.<<ts>> < {_fmt(p['RAPID_LAYER_GAP_S'])}"
+
+    return _chain_query(p["RAPID_LAYER_MIN_HOPS"], p["RAPID_LAYER_MAX_HOPS"], hop)
 
 
 def _q_cross_rail_layering(p: dict) -> str:

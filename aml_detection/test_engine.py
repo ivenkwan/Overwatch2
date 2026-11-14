@@ -24,6 +24,10 @@ TG_COLS = {
     "alert_id", "scenario_code", "scenario_category", "rail", "severity",
     "trigger_entity", "related_transactions", "rule_version", "status", "created_at", "resolved_at",
 }
+APP_COLS = {
+    "alert_id", "tenant_id", "alert_type", "risk_score", "status",
+    "customer_id", "payload", "created_at", "created_by",
+}
 
 
 class FakeCur:
@@ -67,8 +71,8 @@ class FakeConn:
 def _sink_with(columns):
     """A sink class that injects a fixed column set (no information_schema)."""
     class _S(AlertSink):
-        def __init__(self, profile, cur):
-            super().__init__(profile, cur, columns=columns)
+        def __init__(self, profile, cur, tenant_id=None):
+            super().__init__(profile, cur, columns=columns, tenant_id=tenant_id)
     return _S
 
 
@@ -126,6 +130,22 @@ def test_alerts_sunk_to_each_profile_table():
     assert all("ag_catalog.alerts" in s for s, _ in inserts)
     # Every variant statement produced an insert (8 scenarios x 2 variants).
     assert len(inserts) == 16
+
+
+# ---- TASK-061: tenant-scoped operational sink -------------------------------
+
+def test_engine_sinks_to_tenant_scoped_app_alerts():
+    from dataclasses import replace
+
+    tenant = "6006dc90-28dd-4c52-9fe7-a5dbecdea7ae"
+    cur = FakeCur(hits=[("ACC_X", ["h1", "h2"])])
+    profile = replace(AML_NETWORK, alert_table="app.alerts")
+    summary = detect(profile, FakeConn(cur), sink_class=_sink_with(APP_COLS), tenant_id=tenant)
+    assert summary["errors"] == []
+    inserts = [(s, p) for s, p in cur.executed if s.startswith("INSERT")]
+    assert inserts and all("app.alerts" in s for s, _ in inserts)
+    # tenant_id is the first bound value of every operational insert.
+    assert all(p[0] == tenant for _, p in inserts)
 
 
 def test_summary_profile_name():
